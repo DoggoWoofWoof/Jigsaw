@@ -8,7 +8,9 @@ This repository is currently organized for the conference submission. Raw cloud 
 
 ### Submission status
 
-Submission builds are in `paper/` — proceedings-track manuscript `jigsaw_log2026.tex` (OpenReview) and the ECML-PKDD variant `jigsaw_ecmlpkdd.tex`; metadata in `paper/openreview_submission_metadata.md`. Headline: a FullCov-trained GNN retrieval layer for exact Glasgow matching recovers **88.6%** of full-MAG positives under **2.4 GB** residence (vs 10.2 GB whole-graph; direct Glasgow solves 0/15), with boundary overlap nearly doubling matched-half-budget recovery (44.4% → 88.9%) and query-derived pruning provably lossless. Every manuscript number is re-checkable from the committed CSVs via the `scripts/analysis/validate_*.py` suite (budget fairness, benchmark denominators, query-derived pruning, matched production costs) and `scripts/analysis/reproduce_paper_numbers.py`.
+The current manuscript is the PVLDB submission `paper/jigsaw_vldb2027.tex` (systems-first framing, two-column PVLDB/acmart format). Earlier builds are retained for provenance: `paper/jigsaw_log2026.tex` (prior LoG/OpenReview version) and `paper/jigsaw_ecmlpkdd.tex` (ECML-PKDD variant).
+
+Headline: a FullCov-trained GNN retrieval layer for exact Glasgow matching recovers **88.6%** of full-MAG positives under **2.4 GB** residence (vs 10.2 GB whole-graph; direct Glasgow solves 0/15), with boundary overlap nearly doubling matched-half-budget recovery (44.4% -> 88.9%) and query-derived pruning provably lossless. Every manuscript number is re-checkable from the committed CSVs via the `scripts/analysis/validate_*.py` suite (budget fairness, benchmark denominators, query-derived pruning, matched production costs) and `scripts/analysis/reproduce_paper_numbers.py`.
 
 ## Final Results
 
@@ -25,7 +27,7 @@ The final production matrix covers MAG, Arxiv, and Cora with two seeds, six prod
 ## Repository layout
 
 ```
-paper/                         Manuscript: samplepaper.tex, figures (*.png), tables (table_*.tex), bib/cls.
+paper/                         Manuscript: jigsaw_vldb2027.tex (current PVLDB build), figures (*.png), tables (table_*.tex), acmart/pvldb style files.
 benchmarks/paper_results/      Verified, reviewer-facing evidence backing the paper:
     final_results/             canonical summaries (final_all_datasets_summary.csv, per-dataset, audit).
     ablations/                 FullCov objective ablation + design ablation CSVs (back Tables 1 and the design table).
@@ -77,6 +79,23 @@ python scripts\analysis\reproduce_paper_numbers.py
 The checker verifies the MAG deployed-encoder matrix, Cora/Arxiv label-selectivity selector, and MAG retrieval-remedy foreclosure from local CSVs. It treats non-core GNN-PE diagnostic provenance as optional unless `--strict-optional` is passed.
 
 Budget reporting uses explicit columns: `first_solved_at_<B>` is the exact first-hit bucket, while `solved_by_<B>` is cumulative and should be used for budget-curve analysis.
+
+## Paper claims -> evidence -> reproduction
+
+Each headline claim in `paper/jigsaw_vldb2027.tex` maps to a committed evidence file and a command. All commands read local CSVs/JSON and need no GPU or cloud access.
+
+| Paper claim (location) | Evidence file | Command |
+|---|---|---|
+| Main benchmark, Cora/Arxiv/MAG solve 94.2/92.8/88.6% (Table 2) | `benchmarks/paper_results/final_results/final_all_datasets_summary.csv`, `HEADLINE_NUMBERS.csv` | `python scripts/analysis/reproduce_paper_numbers.py` |
+| FullCov objective ablation (Table 1) | `benchmarks/paper_results/ablations/retrieval_arxiv_khop_fair_ablation_*.csv` | `python scripts/analysis/validate_manuscript_claims.py` |
+| Scaling break, direct Glasgow 0/15 at Arxiv/MAG (Table 3, Fig 3) | `benchmarks/paper_results/ablations/scaling_half_budget_paired_summary.csv` | `python scripts/generate_scaling_figure.py` |
+| Memory-bounded serving, 2.4 vs 10.2 GB / 4.2x (Sec 5.3, Fig 4) | `paper/fig_memory_latency.png`, `scripts/streaming_serve_smoke.py` | `python scripts/streaming_serve_smoke.py` |
+| Encoder depth: no oversmoothing, residual is the mechanism (Table 6, Fig 5) | `benchmarks/paper_results/ablations/oversmoothing_{corafull,arxiv,mag}.json`, `oversmoothing_summary.md` | see `oversmoothing_summary.md` (CPU, deployed weights) |
+| Operator necessity: overlap halves MAG solve (Table 9) | `benchmarks/paper_results/ablations/operator_ablation_half_budget_summary.csv` | `python scripts/analysis/validate_manuscript_claims.py` |
+| Lossless pruning (Prop 5.1) | committed per-query survival CSVs | `python scripts/analysis/validate_query_derived_pruning.py` |
+| Exactness: raw-attribute audit, zero collisions on 1,800 MAG positives (guarantee box) | `benchmarks/paper_results/` audit CSVs | `python scripts/analysis/validate_mag_raw_acceptance_audit.py` |
+| Half-partition budget fairness | budget CSVs | `python scripts/analysis/validate_paper_budget_fairness.py` |
+| Benchmark denominators (7,200 unique queries) | `benchmarks/paper_results/final_results/production_grid_coverage.csv` | `python scripts/analysis/validate_benchmark_denominators.py` |
 
 ## Exactness Scope
 

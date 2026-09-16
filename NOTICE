@@ -1,0 +1,9 @@
+Jigsaw: Memory-Bounded Exact Subgraph Matching on Million-Node Attributed Graphs
+Copyright 2026 Swastik Mohapatra
+
+Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+This project builds on third-party components that retain their own licenses,
+including the Glasgow Subgraph Solver, PyTorch Geometric (GraphSAGE, RGCN),
+METIS, and FAISS. Benchmark datasets (Cora, OGBN-Arxiv, OGBN-MAG) are governed
+by their original dataset licenses and are not redistributed here.
