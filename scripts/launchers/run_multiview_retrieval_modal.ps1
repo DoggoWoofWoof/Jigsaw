@@ -4,7 +4,7 @@ param(
     [int]$ViewCount = 6,
     [double]$ViewFraction = 0.6,
     [int]$SupportDepth = 20,
-    [string]$Profile = "***REMOVED***"
+    [string]$Profile = "$env:MODAL_PROFILE"
 )
 
 $ErrorActionPreference = "Stop"

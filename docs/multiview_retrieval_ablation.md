@@ -146,7 +146,7 @@ occurrence across query parts is not better than the current fixed ranking.
   -ViewCount 6 `
   -ViewFraction 0.6 `
   -SupportDepth 20 `
-  -Profile ***REMOVED***
+  -Profile $env:MODAL_PROFILE
 ```
 
 ```powershell

@@ -1,7 +1,7 @@
 param(
     [int]$Queries = 100,
     [int[]]$Seeds = @(20260607, 20260608),
-    [string]$Profile = "***REMOVED***"
+    [string]$Profile = "$env:MODAL_PROFILE"
 )
 
 $ErrorActionPreference = "Stop"

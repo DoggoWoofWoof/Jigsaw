@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import os
 from pathlib import Path
 
 
@@ -24,7 +25,7 @@ DEFAULT_PACKAGE = Path("runs/lightning_rgcn_code_package")
 def vm_upload_run(args: argparse.Namespace) -> None:
     from lightning_sdk.studio import VM
 
-    vm = VM(name=args.vm_name, teamspace="general", org="***REMOVED***-org", create_ok=False)
+    vm = VM(name=args.vm_name, teamspace="general", org=os.environ.get("LIGHTNING_ORG"), create_ok=False)
     print(f"[VM] {vm.name} status={vm.status}")
     if str(vm.status).lower() != "running":
         vm.start()

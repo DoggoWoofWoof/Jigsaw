@@ -13,7 +13,7 @@ param(
 
     [string]$HierarchyPath = "",
 
-    [string]$Profile = "***REMOVED***",
+    [string]$Profile = "$env:MODAL_PROFILE",
 
     [switch]$IncludeKSweep,
 

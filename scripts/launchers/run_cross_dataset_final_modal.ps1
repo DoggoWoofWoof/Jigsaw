@@ -13,7 +13,7 @@ param(
 
     [int]$QuerySizeJitter = -1,
 
-    [string]$Profile = "***REMOVED***"
+    [string]$Profile = "$env:MODAL_PROFILE"
 )
 
 $ErrorActionPreference = "Stop"

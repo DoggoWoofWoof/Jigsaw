@@ -746,7 +746,7 @@ OOM or Python traceback at approximately epochs 48--60. Subsequent app
 creation was rejected because that workspace reached its billing-cycle spend
 limit. The six committed checkpoints and the exact cached Arxiv partition
 hierarchy were preserved and migrated to the explicitly approved
-`***REMOVED***` workspace.
+second Modal workspace.
 
 The resumed jobs load the original `/cache/arxiv_hierarchies_finecov_v1.pt`
 before loading their matching model, optimizer, scheduler, and global-step
