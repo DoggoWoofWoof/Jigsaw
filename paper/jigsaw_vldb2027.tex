@@ -44,6 +44,12 @@
 Exact subgraph matching enumerates every embedding of a small attributed query graph in a large data graph, and it underpins graph databases, knowledge-graph search, and program analysis. Exact solvers are memory-bound: run over the whole graph, the Glasgow Subgraph Solver enumerates all 15 test queries on CoraFull (19.8K nodes) but none once the graph reaches OGBN-Arxiv scale (169K nodes), and at a million nodes holding the graph together with the solver's candidate domains resident becomes impractical. We present \textbf{Jigsaw}, a retrieval-constrained matcher that keeps exact matching feasible under a fixed memory budget. Jigsaw partitions the data graph offline, retrieves a small set of candidate partitions per query with a coverage-trained encoder, expands them by one-hop boundary overlap, prunes by typed signature and exact label, and invokes the exact solver only inside the retrieved candidate. The guarantee is precise: every returned mapping is an exact match within the retrieved candidate under a configured discrete label semantics, verified by the solver alone, and the memory budget $K$ trades recall for footprint but never soundness; a bounded no-match result is not a certificate of global non-existence. On OGBN-MAG (1.9M nodes) Jigsaw solves \textbf{88.6\%} of 1{,}800 planted positives while a two-pass streaming implementation holds \textbf{2.4}\,GB instead of \textbf{10.2}\,GB for whole-graph residence ($4.2\times$ less). Because the value of learning depends on label selectivity, Jigsaw routes retrieval by an offline selectivity statistic: a classical label index dominates when labels are near-unique (96.7\% on MAG) and the coverage-trained encoder dominates under realistic class labels. We report both rather than a single winner, turning retrieval into a practical execution layer for exact verification rather than a neural replacement for it.
 \end{abstract}
 
+\keywords{exact subgraph matching, subgraph isomorphism, attributed graphs, graph retrieval, memory-bounded query processing, graph partitioning, learned retrieval}
+
+\ccsdesc[500]{Information systems~Graph-based database models}
+\ccsdesc[300]{Mathematics of computing~Graph algorithms}
+\ccsdesc[300]{Computing methodologies~Machine learning approaches}
+
 \maketitle
 
 %%% do not modify the following VLDB block %%
