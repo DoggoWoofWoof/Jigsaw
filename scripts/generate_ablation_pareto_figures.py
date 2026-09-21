@@ -61,11 +61,14 @@ MAG_CLASSICAL_COLD_S = 8.4
 
 def memory_latency():
     fig, ax = plt.subplots(1, 3, figsize=(17.5, 5.2))
-    ds = ["Cora", "Arxiv", "MAG"]
+    ds = ["CoraFull", "Arxiv", "MAG"]
     xx = np.arange(3)
     w = 0.36
     # PANEL 1: memory reduction bars (streaming vs whole-graph resident)
-    stream = [0.797, 0.628, 1.884]
+    # MAG streaming = conservative primary serve (2.4 GB -> 4.2x, matches abstract + caption
+    # lead); the optimized 8-partition cache point (1.9 GB, 5.4x) is the cache-8 marker in
+    # panel (c) and is noted on the MAG ratio label below.
+    stream = [0.797, 0.628, 2.43]
     resident = [1.185, 0.958, 10.2]
     ax[0].bar(xx - w / 2, stream, w, label="Jigsaw streaming", color="#1f77b4")
     ax[0].bar(xx + w / 2, resident, w, label="Whole-graph resident", color="#d62728")
@@ -76,7 +79,8 @@ def memory_latency():
     for i, (s, r) in enumerate(zip(stream, resident)):
         ax[0].text(i - w / 2, s * 1.05, f"{s:.1f}", ha="center", va="bottom", fontsize=9)
         ax[0].text(i + w / 2, r * 1.05, f"{r:.1f}", ha="center", va="bottom", fontsize=9)
-        ax[0].text(i, r * 1.35, f"{r/s:.1f}×", ha="center", va="bottom", fontsize=10.5,
+        lbl = f"{r/s:.1f}×" + ("\n(5.4× opt.)" if i == 2 else "")
+        ax[0].text(i, r * 1.35, lbl, ha="center", va="bottom", fontsize=10.5,
                    color="#1f77b4", fontweight="bold")
     ax[0].legend(frameon=False, fontsize=9, loc="upper left")
     ax[0].spines[["top", "right"]].set_visible(False); ax[0].grid(axis="y", alpha=0.3)

@@ -27,16 +27,27 @@ import matplotlib.pyplot as plt
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-# (nodes, dir-suffix). Cora/Arxiv read from CSV; MAG from production-matrix constants.
+# (display name, nodes, key). CoraFull/Arxiv read raw per-query runs when present; MAG and
+# any absent run dir fall back to the canonical verified constants below, so the figure
+# reproduces on a clean clone without the (gitignored) run directories.
 DATASETS = [
-    ("Cora", 19_793),
-    ("Arxiv", 169_343),
-    ("MAG", 1_939_743),
+    ("CoraFull", 19_793, "cora"),
+    ("Arxiv", 169_343, "arxiv"),
+    ("MAG", 1_939_743, "mag"),
 ]
 
-# MAG production-matrix numbers (see paper Sec. 5; runs/directsolver_scaling_summary.md).
-MAG_DIRECT = {"solve_rate": 0.0, "latency_s": float("nan"), "timeout": True}
-MAG_CASCADE = {"solve_rate": 0.886, "latency_s": 6.97}  # walk-aware headline, matches Table production_matrix (avg_total_s)
+# Canonical verified results (paper Table 3, tab:scaling_latency): direct full-graph Glasgow
+# vs the Jigsaw cascade at matched half-partition budgets.
+DIRECT_CANON = {
+    "cora":  {"solve_rate": 1.0, "latency_s": 2.74, "timeout": False},
+    "arxiv": {"solve_rate": 0.0, "latency_s": 49.0, "timeout": True},
+    "mag":   {"solve_rate": 0.0, "latency_s": float("nan"), "timeout": True},
+}
+CASCADE_CANON = {
+    "cora":  {"solve_rate": 1.0, "latency_s": 0.03},
+    "arxiv": {"solve_rate": 1.0, "latency_s": 0.11},
+    "mag":   {"solve_rate": 0.886, "latency_s": 6.97},  # walk-aware headline, matches production_matrix
+}
 
 
 def _per_query(path_glob: str) -> pd.DataFrame:
@@ -86,12 +97,11 @@ def _cascade_stats(path_glob: str, reporting_budget: int) -> dict:
 
 def collect() -> tuple[list, list]:
     direct, cascade = [], []
-    for name, nodes in DATASETS:
-        if name == "MAG":
-            direct.append((name, nodes, MAG_DIRECT))
-            cascade.append((name, nodes, MAG_CASCADE))
+    for name, nodes, ds in DATASETS:
+        if ds == "mag":
+            direct.append((name, nodes, DIRECT_CANON["mag"]))
+            cascade.append((name, nodes, CASCADE_CANON["mag"]))
             continue
-        ds = name.lower()
         d = _stats(_per_query(f"{ROOT}/runs/directsolver_{ds}_v2/results/*_per_query.csv"))
         reporting_budget = {"cora": 10, "arxiv": 100}[ds]
         c = _cascade_stats(
@@ -99,8 +109,9 @@ def collect() -> tuple[list, list]:
             f"results/*s20260607*neural*per_query.csv",
             reporting_budget,
         )
-        direct.append((name, nodes, d))
-        cascade.append((name, nodes, c))
+        # Fall back to the canonical verified constants when the raw run dir is absent.
+        direct.append((name, nodes, d or DIRECT_CANON[ds]))
+        cascade.append((name, nodes, c or CASCADE_CANON[ds]))
     return direct, cascade
 
 
@@ -129,8 +140,13 @@ def main() -> None:
     for i, v in enumerate(c_solve):
         axL.text(i + w / 2, v + 2, f"{v:.0f}%", ha="center", fontsize=8)
     axL.set_xticks(list(x))
-    axL.set_xticklabels([f"{n}\n({k/1000:.0f}K nodes)" if k < 1e6 else f"{n}\n({k/1e6:.1f}M nodes)"
-                         for n, k in zip(names, nodes)])
+    def _nodes_label(k):
+        if k >= 1e6:
+            return f"{k/1e6:.1f}M nodes"
+        if k >= 1e5:
+            return f"{k/1000:.0f}K nodes"
+        return f"{k/1000:.1f}K nodes"
+    axL.set_xticklabels([f"{n}\n({_nodes_label(k)})" for n, k in zip(names, nodes)])
     axL.set_ylabel("Queries solved exactly (%)")
     axL.set_ylim(0, 112)
     axL.set_title("(a) Feasibility vs graph scale")
@@ -192,7 +208,7 @@ def main() -> None:
                 "dataset": name.lower(),
                 "nodes": nodes,
                 "paired_queries": 15 if name != "MAG" else "separate diagnostics",
-                "jigsaw_budget": {"Cora": 10, "Arxiv": 100, "MAG": 1000}[name],
+                "jigsaw_budget": {"CoraFull": 10, "Arxiv": 100, "MAG": 1000}[name],
                 "jigsaw_budget_fraction": 0.5,
                 "direct_solve_rate_percent": 100 * direct_stats.get("solve_rate", 0),
                 "direct_median_seconds": direct_stats.get("latency_s"),

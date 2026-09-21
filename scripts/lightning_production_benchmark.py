@@ -161,9 +161,15 @@ for root in [Path("/workspace/jigsaw_pkg")]:
     for path in sorted([p for p in root.rglob("*") if "\\" in p.name], key=lambda p: len(p.parts)):
         target = path.parent.joinpath(*[part for part in path.name.split("\\") if part])
         target.parent.mkdir(parents=True, exist_ok=True)
+        if path.is_file():
+            if target.exists():
+                if target.is_dir():
+                    raise RuntimeError(f"Cannot replace directory with overlay file: {target}")
+                target.unlink()
+            path.replace(target)
+            moved += 1
+            continue
         if target.exists():
-            if path.is_file():
-                path.unlink()
             continue
         path.replace(target)
         moved += 1

@@ -40,7 +40,7 @@ Exact subgraph-isomorphism solvers such as Glasgow are sound and complete, but a
 
 Subgraph isomorphism is used in motif discovery, scientific graph analysis, fraud search, and security auditing. Exact solvers are sound and complete but pay for large candidate domains; learned retrieval scales better but does not certify matches. Jigsaw composes the two: learned narrowing followed by exact verification.
 
-Jigsaw partitions a large graph, embeds queries and partitions into a shared space, retrieves candidate partitions, stitches overlap neighborhoods, prunes by typed signatures and exact labels, and calls Glasgow. If retrieval covers the planted match, the verifier certifies the result inside the candidate; if retrieval misses a required region, local soundness remains but global completeness is lost. FullCov makes this coverage condition explicit.
+Jigsaw partitions a large graph, embeds queries and partitions into a shared space, retrieves candidate partitions, stitches overlap neighborhoods, prunes by typed signatures and exact labels, and calls Glasgow (Figure~\ref{fig:pipeline}). If retrieval covers the planted match, the verifier certifies the result inside the candidate; if retrieval misses a required region, local soundness remains but global completeness is lost. FullCov makes this coverage condition explicit.
 
 We evaluate Cora, OGBN-Arxiv, and MAG with two seeds, three sizes, six positive and two negative families, and six retrieval policies. Cora/Arxiv reach $100\%$ only at the exhaustive all-partition budget; at the matched half-partition budget Jigsaw reaches $94.2/92.8/88.6\%$ on Cora/Arxiv/MAG.
 
@@ -56,8 +56,6 @@ We evaluate Cora, OGBN-Arxiv, and MAG with two seeds, three sizes, six positive 
 
 \paragraph{Exact solvers.}
 The decision problem is NP-complete~\cite{ref_garey}, and exact subgraph search dates to Ullmann~\cite{ref_ullmann}. Modern solvers such as VF2~\cite{ref_vf2}, RI~\cite{ref_ri}, LAD~\cite{ref_lad}, VF3~\cite{ref_vf3}, and Glasgow~\cite{ref_glasgow} use propagation, branching, and search ordering. Filter-and-verify matchers such as GQL~\cite{ref_graphql}, TurboISO~\cite{ref_turboiso}, CFL-Match~\cite{ref_cflmatch}, DAF/DP-iso~\cite{ref_daf}, and GSI~\cite{ref_gsi} restrict query-vertex candidates before enumeration; both established and recent studies compare these design choices~\cite{ref_survey,ref_survey2024}. Relational systems compile patterns into binary and worst-case-optimal joins~\cite{ref_wcoj}, with distributed low-memory dataflows extending the approach to very large graphs~\cite{ref_lowmem}. Out-of-core enumeration (DUALSIM~\cite{ref_dualsim}) and distributed systems (STwig/Trinity~\cite{ref_trinity}, G-thinker~\cite{ref_gthinker}) stream or shard the \emph{entire} graph. Jigsaw instead uses learned relevance to bound which regions enter memory. Direct CFL-Match/DP-iso/GQL runs solve Cora/Arxiv and high-selectivity MAG once loaded, while coarse labels reduce completion to 12/27 solver-query executions; CP-based Glasgow finishes 0/15 full-MAG queries. Jigsaw contributes a complementary bounded-memory execution frontier.
-
-\paragraph{Low-selectivity diagnostic.} With MAG labels coarsened to 32 deterministic buckets, CFL-Match/DP-iso/GQL complete $12/27$ executions: $8/9$ at size 20 and $2/9$ at each of sizes 50 and 100, with random-walk at $3/9$. Candidate tables reach $2.4$M entries and 15 calls hit the 120\,s limit, locating the tractability crossover in candidate construction as selectivity falls.
 
 \paragraph{Neural graph matching and retrieval.}
 Graph-pair learning builds on expressive GNN encoders such as GIN~\cite{ref_gin} and includes SimGNN~\cite{ref_simgnn}, Graph Matching Networks~\cite{ref_gmn}, and partitioned similarity estimation~\cite{ref_psimgnn}. Subgraph retrieval methods include NeuroMatch~\cite{ref_neuromatch}, ISONET~\cite{ref_isonet}, and ISONET++~\cite{ref_isonetpp}; a recent study maps their neural alignment design space~\cite{ref_neuraldesign}. GLSearch~\cite{ref_glsearch} learns maximum-common-subgraph search, and neural counting~\cite{ref_nsic} predicts counts. GNN-PE~\cite{ref_gnnpe} uses path-dominance pruning before exact matching but keeps a whole-graph index, while NeuGN~\cite{ref_neugn} learns navigation inside resident exact enumeration. Jigsaw instead learns which coarse regions enter a reduced, streamed domain and leaves acceptance to Glasgow; partition coverage is the central learning metric.
@@ -81,7 +79,7 @@ Soundness never depends on $K$: any returned match is a true match for every bud
 \section{Jigsaw Method}
 \label{sec:method}
 
-\begin{figure}[t]
+\begin{figure}[H]
 \centering
 \includegraphics[width=0.78\textwidth]{fig_jigsaw_pipeline.png}
 \caption{\textbf{Jigsaw pipeline.} The learned component ranks partitions, but the only accepting step is Glasgow verification inside the stitched candidate graph. FullCov is the condition under which the candidate contains every partition needed by the planted match.}
@@ -110,7 +108,7 @@ The $\min$ (and its CVaR relaxation) follows from the metric. $\mathrm{FullCov@K
 
 The encoder is shared between query and partition graphs: features are projected to 256-d, passed through six residual message-passing blocks with LayerNorm, and read out by multi-layer mean/max/sum pooling into an $L_2$-normalized 128-d vector. This matters because the problem is region localization, not node alignment: the model must place a query near \emph{every} partition needed for verification, including the farthest true one. For Cora/Arxiv the block is GraphSAGE~\cite{ref_graphsage} ($\mathtt{SAGEConv}$), at least as strong as GIN at the budgets the cascade uses. OGBN-MAG is \emph{heterogeneous} (paper/author/institution/field nodes, typed relations); we flatten to a single index but \emph{retain} node and relation types via a six-layer RGCN~\cite{ref_rgcn} ($\mathtt{RGCNConv}$, per-relation bases over $2R$ symmetrized relations). Since only paper nodes carry features, others receive node-type one-hot and per-relation-degree features, so the retriever reasons over typed structure.
 
-Both encoders share one retrieval interface: cached fine and coarse partition embeddings are compared to query embeddings, and positive partitions can be live-reencoded during training so coverage gradients update required positives instead of treating the partition bank as stale constants. Training uses three signals: multi-positive contrastive learning toward all touched partitions, hard negatives that separate nearby incorrect partitions, and the FullCov coverage term on the weakest required positive. For MAG, production uses the checkpoint selected by validation FullCov; the final-epoch checkpoint is retained only as a separate diagnostic and is never averaged into production.
+Both encoders share one retrieval interface: cached fine and coarse partition embeddings are compared to query embeddings, and positive partitions can be live-reencoded during training so coverage gradients update required positives instead of treating the partition bank as stale constants. Training uses three signals: multi-positive contrastive learning toward all touched partitions, hard negatives that separate nearby incorrect partitions, and the FullCov coverage term on the weakest required positive. For MAG, the deployed model uses the checkpoint selected by validation FullCov; the final-epoch checkpoint is retained only as a separate diagnostic and is never averaged into the main benchmark.
 
 \paragraph{Why exactness is conditional.}
 The architecture does not make the retriever an exact solver; it proposes a candidate boundary, and once $G_C$ is constructed Glasgow gives exact answers for $G_C$. A positive query can fail for two reasons: the retrieval boundary does not contain the planted solution, or the candidate becomes too large and the solver times out. The benchmark records both through coverage diagnostics, timeout counts, and solved-by-budget curves. Negative queries test whether the candidate construction plus exact verifier returns no match when the generator intended an impossible query.
@@ -150,7 +148,7 @@ Tables~\ref{tab:partition_sizes} and~\ref{tab:partition_overlap} summarize the h
 We report FullCov@K/recall for retrieval and exact-solve rate, no-match accuracy, false positives, timeouts, candidate size, and wall-clock components for verification.
 
 \paragraph{Benchmark completion and data hygiene.}
-Each dataset has 2,400 unique queries: 1,800 positives (6 families) and 600 negatives (2 families), from 2 seeds, 3 sizes, and 50 queries per cell. Applying 6 policies gives 14,400 policy-query evaluations before budget expansion, summarized by 288 production rows (6 methods $\times$ 2 seeds $\times$ 8 families $\times$ 3 sizes). A serving-path audit covers all 7,200 unique queries: query-payload tokens equal the legacy evaluation tokens for all 5,400 positives, all 900 label-corrupted negatives intentionally diverge, and all 1,800 negatives were rerun with pruning tokens derived only from each submitted query. Diagnostic variants are kept separate from canonical rows.
+Each dataset has 2,400 unique queries: 1,800 positives (6 families) and 600 negatives (2 families), from 2 seeds, 3 sizes, and 50 queries per cell. Across three datasets this is 7,200 unique queries, comprising 5,400 positives and 1,800 negatives. Applying 6 policies gives 14,400 policy-query evaluations before budget expansion, summarized by 288 main-benchmark rows (6 methods $\times$ 2 seeds $\times$ 8 families $\times$ 3 sizes). As a dataset-integrity audit, the planted witnesses for all 1,800 MAG positives (101,951 node pairs), whether solved or not, agree in raw attributes, feature labels, and the serving-safe node-type/feature signature. All 1,800 negatives use pruning tokens derived only from each submitted query. Diagnostic variants remain separate from canonical rows.
 
 \paragraph{Implementation.} Partitioning uses METIS, embeddings use FAISS, and Glasgow verifies integer-labeled candidates obtained by discretizing node features. Timings are per-query wall-clock on 8-vCPU Google Cloud instances with a 30\,s verifier budget. Encoders, query seeds, hierarchies, and manifests will be released.
 
@@ -183,14 +181,14 @@ The locked K-hop suite has zero queries impossible at $K=20,50,100$; average tru
 
 \clearpage
 \begin{samepage}
-\subsection{Three-Dataset Production Matrix}
+\subsection{Three-Dataset Main Benchmark}
 
 Table~\ref{tab:production_matrix} reports exact planted-match recovery, correct no-match behavior, false positives, solver timeouts, candidate nodes, cascade time, and verifier time. Cascade time sums candidate construction and exact verification and excludes retrieval/ranking.
 \end{samepage}
 
 \begin{table}[H]
 \centering
-\caption{\textbf{Final production metrics.} Pos. uses matched half-partition budgets $K{=}10/100/1000$; FilterAll uses the all-partition ceiling. Neg. is audited no-match accuracy; FP counts negative false positives, while TO counts positive-query solver timeouts (FeatureIndex was run on positives only). Candidate and timing columns use the same endpoint as Pos. Cascade time is candidate construction plus exact verification and excludes retrieval/ranking.}
+\caption{\textbf{Final main-benchmark metrics.} Pos. uses matched half-partition budgets $K{=}10/100/1000$; FilterAll uses the all-partition ceiling. Neg. is audited no-match accuracy; FP counts negative false positives, while TO counts positive-query solver timeouts (FeatureIndex was run on positives only). Candidate and timing columns use the same endpoint as Pos. Cascade time is candidate construction plus exact verification and excludes retrieval/ranking.}
 \label{tab:production_matrix}
 \setlength{\tabcolsep}{2.5pt}
 \resizebox{\textwidth}{!}{%
@@ -255,7 +253,7 @@ The central systems result is the scaling break: direct CP-based Glasgow solves 
 
 \begin{table}[H]
 \centering
-\caption{\textbf{Scaling and latency: direct full-graph solver vs.\ Jigsaw cascade.} Cora/Arxiv use the same 15 K-hop queries and Jigsaw is evaluated at matched half-partition budgets ($K=10/100$), avoiding exhaustive Cora retrieval. The MAG direct cell is its 15-query timeout diagnostic, while $^\ast$ the MAG Jigsaw cell is separately the 1,800-positive production mean at $K=1{,}000$.}
+\caption{\textbf{Scaling and latency: direct full-graph solver vs.\ Jigsaw cascade.} Cora/Arxiv use the same 15 K-hop queries and Jigsaw is evaluated at matched half-partition budgets ($K=10/100$), avoiding exhaustive Cora retrieval. The MAG direct cell is its 15-query timeout control, while $^\ast$ the MAG Jigsaw cell is separately the 1,800-positive main-benchmark mean at $K=1{,}000$.}
 \label{tab:scaling_latency}
 \small
 \begin{tabular}{l r c r c r r}
@@ -296,7 +294,7 @@ FilterAll & 98.4 & [97.8, 98.9] & 2 / 225, \ $p{=}2.4{\times}10^{-64}$ \\
 
 \begin{table}[H]
 \centering
-\caption{\textbf{Jigsaw query-family breakdown.} Positive columns report exact-solve rate; negative columns report correct no-match rate. All three datasets use the connected-positive protocol. All datasets are reported at the matched half-partition budget ($K{=}10/100/1000$); the MAG rows use the deployed walk-aware encoder (overall $88.6\%$).}
+\caption{\textbf{Jigsaw query-family breakdown.} Positive columns report exact-solve rate; negative columns report correct no-match rate. All three datasets use the connected-positive protocol. All datasets are reported at the matched half-partition budget ($K{=}10/100/1000$); the MAG rows use the deployed MAG encoder (overall $88.6\%$).}
 \label{tab:jigsaw_family}
 \setlength{\tabcolsep}{3pt}
 \resizebox{\textwidth}{!}{%
@@ -314,9 +312,11 @@ MAG & 98.7 & 93.3 & 92.7 & 71.0 & 100.0 & 76.0 & 100.0 & 99.0 \\
 \label{sec:family}
 The family view explains the aggregate rates. Single and multi-fine saturate, local K-hop families remain high, and random-walk/multi-coarse are hardest across datasets. MAG still solves single $98.7\%$, K-hop $93.3\%$, degree K-hop $92.7\%$, and multi-fine $100\%$; random walks remain lowest at $71.0\%$.
 
-Random walks provide the main stress test. FilterAll solves them at $96.0\%$, and $96.6\%$ of Jigsaw's random-walk misses occur before solving, locating the opportunity in retrieval and overlap coverage rather than Glasgow. Compact K-hop misses often lie on retrieved boundaries and overlap repairs them; diffuse walk misses more often lie in unretrieved interiors. The held-out walk-aware encoder lifts random-walk $60.0\%\!\to\!71.0\%$ and multi-coarse $71.7\%\!\to\!76.0\%$ relative to the generic encoder, showing that learning improves the families in which spatial coverage matters most.
+Random walks provide the main stress test. FilterAll solves them at $96.0\%$, and $96.6\%$ of Jigsaw's random-walk misses occur before solving, locating the opportunity in retrieval and overlap coverage rather than Glasgow. Compact K-hop misses often lie on retrieved boundaries and overlap repairs them; diffuse walk misses more often lie in unretrieved interiors. The held-out deployed encoder lifts random-walk $60.0\%\!\to\!71.0\%$ and multi-coarse $71.7\%\!\to\!76.0\%$ relative to a baseline encoder, showing that learning improves the families in which spatial coverage matters most.
 
 Cumulative solved-by-budget curves rise monotonically to $94.2/92.8/88.6$ at the half-partition budget. On MAG, solve rate rises from $37.6\%$ at small budgets to $88.6\%$ at $K{=}1000$, confirming that candidate coverage, rather than verifier soundness, controls the budget frontier.
+
+\paragraph{Coarse-label stress on resident pipelines.} The same low-selectivity transition breaks resident exact matchers. With MAG labels coarsened to 32 deterministic buckets, CFL-Match/DP-iso/GQL complete $12/27$ executions: $8/9$ at size 20 and $2/9$ at each of sizes 50 and 100, with random-walk at $3/9$. Candidate tables reach $2.4$M entries and 15 calls hit the 120\,s limit, locating the tractability crossover in candidate construction as selectivity falls.
 
 \subsection{Candidate-Shrinkage Cascade and Boundary Overlap}
 \label{sec:shrinkage}

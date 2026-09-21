@@ -1,0 +1,13 @@
+{
+  "altered_label_queries": 300,
+  "cache_files": {
+    "8b919d9200cf49e8_queries.pt": 300,
+    "dacba23d1f4a9569_queries.pt": 300
+  },
+  "pruning_source": "query_payload_v1",
+  "queries_per_family_size": 100,
+  "signature": "type_feat32",
+  "status": "pass",
+  "structure_negative_raw_equal_pairs": 17000,
+  "unique_negative_queries": 600
+}

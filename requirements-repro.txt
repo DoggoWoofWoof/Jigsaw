@@ -1,0 +1,14 @@
+# Minimal dependencies for the clean-clone reproduction path:
+#   * scripts/reproduce_figures.py            (regenerate all 5 paper figures)
+#   * scripts/analysis/reproduce_paper_numbers.py  (re-check headline numbers; stdlib only)
+#   * scripts/analysis/validate_*.py          (claim validators; pandas/numpy)
+#
+# This is NOT the training/serving environment. The compute path (encoder training,
+# full-MAG Glasgow benchmark) needs the heavier stack in requirements_lightning_rgcn.txt
+# plus a GPU, the Glasgow binary, and the datasets. See REPRODUCE.md.
+#
+# Verified with Python 3.13.5 (Python >= 3.11 recommended). These are the exact
+# versions that produced the committed figures; nearby patch releases work too.
+matplotlib==3.10.5
+numpy==2.3.2
+pandas==2.3.1

@@ -54,7 +54,22 @@ tests/                         pytest unit suite (pytest tests/).
 - `scripts/launchers/run_overlap_model_benchmark_jobs.ps1`: Cora/Arxiv benchmark launcher for the overlap-trained GraphSAGE checkpoints.
 - `scripts/launchers/run_lightning_mag_benchmark.sh`: Lightning runtime wrapper used by benchmark jobs.
 - `scripts/summarize_production_benchmarks.py`: canonical per-query to summary aggregation.
-- `scripts/generate_paper_figures_v2.py`: canonical paper figure generation (from `benchmarks/paper_results/final_results/` + `runs/diagnostics/`). Note: `generate_submission_figures.py` is **superseded** (reads a stale run) — do not use it.
+- `scripts/reproduce_figures.py`: **canonical master** that regenerates all five figures in `paper/jigsaw_vldb2027.tex` from committed data only (no `runs/`, GPU, or Glasgow binary). Run this to rebuild paper figures. See `REPRODUCE.md`.
+- `scripts/generate_submission_figures.py`: source of the two hand-drawn schematics `fig_jigsaw_pipeline.png` and `fig_encoder_architecture.png` (invoked by `reproduce_figures.py`). Its **data-driven** figures read a stale run and are not used by the current paper — call only the schematic functions, not its `main()`.
+- `scripts/generate_paper_figures_v2.py`: older data-driven figures (production rates, budget curves, family heatmap, MAG trade-off); none appear in the current PVLDB build, retained for provenance.
+
+## Reproducing Figures
+
+All five figures in `paper/jigsaw_vldb2027.tex` regenerate from committed data (no `runs/`,
+GPU, or Glasgow binary) in one command:
+
+```powershell
+python -m pip install -r requirements-repro.txt
+python scripts\reproduce_figures.py
+```
+
+See [`REPRODUCE.md`](REPRODUCE.md) for the full clean-clone contract (what reproduces on a
+laptop vs what is compute-gated).
 
 ## Reproducing Summaries
 

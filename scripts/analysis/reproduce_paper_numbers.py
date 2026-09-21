@@ -236,6 +236,40 @@ def _gnnpe_optional_checks(strict=False):
     return ok
 
 
+def _freeze_headline(J, R, b, c, p):
+    """Write the validated deployed-encoder headline numbers to a committed CSV so the
+    88.6% walk-aware result is inspectable on a clean clone (the raw per-query runs are
+    gitignored). Values come straight from the local run artifacts this script validates,
+    so the frozen file is a faithful snapshot, not a hand-entered number."""
+    out = os.path.join(ROOT, "benchmarks", "paper_results", "mag_walkaware_headline_summary.csv")
+    rows = []
+
+    def add(scope, name, keys, mp):
+        solved = sum(1 for k in keys if mp[k])
+        total = len(keys)
+        rows.append({"scope": scope, "name": name, "solved": solved, "total": total,
+                     "solve_rate_pct": round(100 * solved / total, 1) if total else "",
+                     "note": ""})
+
+    add("overall", "Jigsaw", list(J), J)
+    for fam in FAMILIES:
+        add("family", fam, [k for k in J if k[0] == fam], J)
+    for sz in ("20", "50", "100"):
+        add("size", sz, [k for k in J if k[1] == sz], J)
+    add("overall", "Mean-RRF", list(R), R)
+    rows.append({"scope": "mcnemar", "name": "Jigsaw_vs_Mean-RRF", "solved": b, "total": c,
+                 "solve_rate_pct": "", "note": f"exact McNemar p={p:.2e}; solved=Jigsaw-wins, total=Mean-RRF-wins"})
+    with open(out, "w", newline="") as fh:
+        fh.write("# Auto-emitted by scripts/analysis/reproduce_paper_numbers.py --freeze from local\n")
+        fh.write("# run artifacts: a machine-checkable snapshot of the deployed walk-aware MAG headline\n")
+        fh.write("# (adds per-size slices + the paired McNemar that HEADLINE_NUMBERS.csv omits).\n")
+        fh.write("# Curated canonical headline for ALL datasets = final_results/HEADLINE_NUMBERS.csv.\n")
+        w = csv.DictWriter(fh, fieldnames=["scope", "name", "solved", "total", "solve_rate_pct", "note"])
+        w.writeheader()
+        w.writerows(rows)
+    print(f"[freeze] wrote {os.path.relpath(out, ROOT)}")
+
+
 def main():
     strict_optional = "--strict-optional" in sys.argv[1:]
     ok = True
@@ -245,6 +279,16 @@ def main():
 
     jig_files = (_g("runs/lightning_completion/mag_walkaware_remaining_v2/final_per_query/*.csv")
                  + _g("runs/lightning_completion/mag_targeted_v1_final/results/*per_query.csv"))
+    if not jig_files:
+        # Clean clone: the raw per-query runs under runs/ are gitignored (many GB of
+        # solver traces). Fail informatively rather than with a cryptic ZeroDivision,
+        # and point at the committed snapshot + the figure path that needs no runs/.
+        print("\n[clean-clone] No local MAG run artifacts found under runs/ (they are gitignored).")
+        print("  Validated headline snapshot is committed at:")
+        print("    benchmarks/paper_results/mag_walkaware_headline_summary.csv")
+        print("  Figures reproduce without runs/:  python scripts/reproduce_figures.py")
+        print("  To re-validate against the raw per-query CSVs, obtain the run bundle (see REPRODUCE.md).")
+        return 0
     J = _solved_map(jig_files, "hybrid", model="mag_walkaware_best")
 
     paper_fam = {"single": 98.7, "k_hop": 93.3, "degree_k_hop": 92.7,
@@ -275,6 +319,9 @@ def main():
     print(f"  n_matched={len(common)}  Jigsaw-only(b)={b}  Mean-RRF-only(c)={c}  exact p={p:.2e}")
     ok &= check("McNemar b (Jigsaw wins)", b, 92, tol=3)
     ok &= check("McNemar c (Mean-RRF wins)", c, 35, tol=3)
+
+    if "--freeze" in sys.argv[1:]:
+        _freeze_headline(J, R, b, c, p)
 
     ok &= _selector_checks()
     ok &= _foreclosure_checks()

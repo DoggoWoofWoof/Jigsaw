@@ -30,8 +30,10 @@ fi
 BEST_MODEL="${BEST_MODEL:-$MODEL_DIR/mag-6_layer-model-rgcn_rgcn_final_loss_mag_seed7202_overlap_topk50_live64_best_fullcov.pth}"
 FINAL_MODEL="${FINAL_MODEL:-$CACHE_ROOT/mag_rgcn_final_loss_mag_seed7202_overlap_topk50_live64_checkpoint.pth}"
 MODEL_SPECS="${MODEL_SPECS:-}"
+SKIP_MODEL_VALIDATION="${SKIP_MODEL_VALIDATION:-0}"
 if [[ -z "$MODEL_SPECS" && "$DATASET" == "mag" ]]; then
-  MODEL_SPECS="mag_rgcn_best=$BEST_MODEL;mag_rgcn_final=$FINAL_MODEL"
+  DEPLOYED_MODEL="$MODEL_DIR/mag-6_layer-model-rgcn_rgcn_final_loss_mag_seed7203_overlap_topk50_live64_best_fullcov.pth"
+  MODEL_SPECS="mag_walkaware_best=$DEPLOYED_MODEL"
 fi
 
 mkdir -p "$CACHE_ROOT" "$MODEL_DIR" "$RESULT_ROOT"
@@ -73,7 +75,7 @@ fi
 if [[ "$DATASET" == "mag" ]]; then
   test -f "$HIERARCHY_PATH" || { echo "[ERROR] Missing hierarchy: $HIERARCHY_PATH"; exit 2; }
 fi
-if [[ -n "$MODEL_SPECS" ]]; then
+if [[ "$SKIP_MODEL_VALIDATION" != "1" && -n "$MODEL_SPECS" ]]; then
   IFS=';' read -ra MODEL_SPEC_ARRAY <<< "$MODEL_SPECS"
   for spec in "${MODEL_SPEC_ARRAY[@]}"; do
     [[ -z "$spec" ]] && continue
@@ -86,6 +88,7 @@ fi
 if [[ -n "${LIGHTNING_QUERY_CACHE_MODEL:-}" && "${RUN_MODE}" != "query-cache" ]]; then
   python - <<'PY'
 import os
+import tarfile
 from pathlib import Path
 from lightning_sdk.models import download_model
 
@@ -94,6 +97,11 @@ target.mkdir(parents=True, exist_ok=True)
 model = os.environ["LIGHTNING_QUERY_CACHE_MODEL"]
 print(f"[LIGHTNING] Downloading query cache {model} -> {target}", flush=True)
 download_model(model, str(target), progress_bar=True)
+archives = list(target.rglob("query_cache_bundle.tar.gz"))
+if archives:
+    with tarfile.open(archives[0], "r:gz") as bundle:
+        bundle.extractall(target)
+    print(f"[LIGHTNING] Extracted compressed query cache: {archives[0]}", flush=True)
 copied = 0
 for path in list(target.rglob("*_queries.pt")):
     dst = target / path.name
@@ -102,12 +110,31 @@ for path in list(target.rglob("*_queries.pt")):
     dst.write_bytes(path.read_bytes())
     copied += 1
 print(f"[LIGHTNING] Query cache files at root: {len(list(target.glob('*_queries.pt')))} (copied {copied})", flush=True)
+
+import torch
+cache_files = sorted(target.glob("*_queries.pt"))
+if not cache_files:
+    raise RuntimeError("Downloaded query-cache model contains no query cache files")
+for path in cache_files:
+    cached = torch.load(path, map_location="cpu", weights_only=False)
+    print(f"[LIGHTNING] Query cache valid: {path.name} rows={len(cached)}", flush=True)
 PY
 fi
 
 echo "[BENCH] dataset=$DATASET"
 echo "[BENCH] hierarchy=$HIERARCHY_PATH"
 echo "[BENCH] models=$MODEL_SPECS"
+
+EVALUATION_ARGS=()
+if [[ -n "${EVALUATION_QUERY_TYPES:-}" ]]; then
+  EVALUATION_ARGS+=(--evaluation-query-types "$EVALUATION_QUERY_TYPES")
+fi
+if [[ -n "${EVALUATION_QUERY_IDS_DIR:-}" ]]; then
+  EVALUATION_ARGS+=(--evaluation-query-ids-dir "$EVALUATION_QUERY_IDS_DIR")
+fi
+if [[ -n "${QUERY_PRUNING_SOURCE:-}" ]]; then
+  EVALUATION_ARGS+=(--query-pruning-source "$QUERY_PRUNING_SOURCE")
+fi
 
 if [[ "${LIGHTNING_RESUME_RESULTS:-1}" == "1" && -n "${LIGHTNING_RESULTS_MODEL:-}" && "$RUN_MODE" != "query-cache" ]]; then
   python - <<'PY' || true
@@ -255,7 +282,7 @@ if [[ "$RUN_MODE" == "query-cache" ]]; then
     --hierarchy-path "$HIERARCHY_PATH" \
     --budgets "${BUDGETS:-20,50,100,200,500,1000}" \
     --full-budget "${FULL_BUDGET:-2000}" \
-    --signature "${SIGNATURE:-type_rel_feat32}" \
+    --signature "${SIGNATURE:-type_feat32}" \
     --solver-timeout "${SOLVER_TIMEOUT:-5}" \
     --data-root "${DATA_ROOT:-$PWD/data}" \
     --cache-dir "$CASCADE_CACHE_DIR" \
@@ -267,16 +294,33 @@ if [[ "$RUN_MODE" == "query-cache" ]]; then
 
   if [[ -n "${LIGHTNING_QUERY_CACHE_MODEL:-}" ]]; then
     QUERY_UPLOAD_DIR="$CACHE_ROOT/query_cache_upload"
+    QUERY_UPLOAD_ARCHIVE_DIR="$CACHE_ROOT/query_cache_archive_upload"
     rm -rf "$QUERY_UPLOAD_DIR"
+    rm -rf "$QUERY_UPLOAD_ARCHIVE_DIR"
     mkdir -p "$QUERY_UPLOAD_DIR"
+    mkdir -p "$QUERY_UPLOAD_ARCHIVE_DIR"
     find "$CASCADE_CACHE_DIR" -maxdepth 1 -type f -name '*_queries.pt' -exec cp {} "$QUERY_UPLOAD_DIR/" \;
+    if [[ "${VALIDATE_QUERY_CACHE_PAYLOADS:-0}" == "1" ]]; then
+      if [[ "${QUERY_TYPES:-}" == "negative_label,negative_structure" ]]; then
+        python scripts/analysis/validate_mag_negative_query_payloads.py \
+          --cache-dir "$QUERY_UPLOAD_DIR" \
+          --data-root "${DATA_ROOT:-$PWD/data}" \
+          --output "$QUERY_UPLOAD_DIR/production_payload_validation.json"
+      else
+        python scripts/analysis/validate_mag_split_query_payloads.py \
+          --cache-dir "$QUERY_UPLOAD_DIR" \
+          --data-root "${DATA_ROOT:-$PWD/data}" \
+          --output "$QUERY_UPLOAD_DIR/production_payload_validation.json"
+      fi
+    fi
     ls -lh "$QUERY_UPLOAD_DIR"
+    tar -C "$QUERY_UPLOAD_DIR" -czf "$QUERY_UPLOAD_ARCHIVE_DIR/query_cache_bundle.tar.gz" .
     python - <<'PY'
 import os
 from pathlib import Path
 from lightning_sdk.models import upload_model
 
-source = Path(os.environ.get("CACHE_ROOT", "cache")) / "query_cache_upload"
+source = Path(os.environ.get("CACHE_ROOT", "cache")) / "query_cache_archive_upload"
 model = os.environ["LIGHTNING_QUERY_CACHE_MODEL"]
 print(f"[LIGHTNING] Uploading query cache {source} -> {model}", flush=True)
 upload_model(model, path=source, progress_bar=True)
@@ -290,6 +334,7 @@ python scripts/run_mag_benchmark_matrix_local.py \
   --queries "${QUERIES_PER_TYPE:-50}" \
   --target-sizes "${TARGET_SIZES:-20,50,100}" \
   --query-types "${QUERY_TYPES:-all}" \
+  "${EVALUATION_ARGS[@]}" \
   --seeds "${SEEDS:-20260607,20260608}" \
   --methods "${METHODS:-neural_component,random_component,mean_feature_component,mean_rrf_component,filterall_component}" \
   --ablation-set "${ABLATION_SET:-none}" \
@@ -298,7 +343,7 @@ python scripts/run_mag_benchmark_matrix_local.py \
   --hierarchy-path "$HIERARCHY_PATH" \
   --budgets "${BUDGETS:-20,50,100,200,500,1000}" \
   --full-budget "${FULL_BUDGET:-2000}" \
-  --signature "${SIGNATURE:-type_rel_feat32}" \
+  --signature "${SIGNATURE:-type_feat32}" \
   --solver-timeout "${SOLVER_TIMEOUT:-5}" \
   --data-root "${DATA_ROOT:-$PWD/data}" \
   --cache-dir "$CASCADE_CACHE_DIR" \
@@ -344,23 +389,24 @@ for item in result_root.iterdir():
         shutil.copytree(item, dst)
     else:
         shutil.copy2(item, dst)
-derived = bundle / "overlap_cascade"
-derived.mkdir(exist_ok=True)
-patterns = (
-    "*_prepared_hierarchy.pt",
-    "*_overlap_index.pt",
-    "*_coarse_embeddings.pt",
-    "*_signature_tokens.pt",
-    "*_feature_label_tokens.pt",
-    "*_coarse_mean_features.pt",
-    "*_coarse_topo_features.pt",
-)
 copied = 0
-if cache_root.exists():
-    for pattern in patterns:
-        for src in cache_root.glob(pattern):
-            shutil.copy2(src, derived / src.name)
-            copied += 1
+if os.environ.get("LIGHTNING_RESULTS_ONLY", "0") != "1":
+    derived = bundle / "overlap_cascade"
+    derived.mkdir(exist_ok=True)
+    patterns = (
+        "*_prepared_hierarchy.pt",
+        "*_overlap_index.pt",
+        "*_coarse_embeddings.pt",
+        "*_signature_tokens.pt",
+        "*_feature_label_tokens.pt",
+        "*_coarse_mean_features.pt",
+        "*_coarse_topo_features.pt",
+    )
+    if cache_root.exists():
+        for pattern in patterns:
+            for src in cache_root.glob(pattern):
+                shutil.copy2(src, derived / src.name)
+                copied += 1
 print(f"[LIGHTNING] Uploading benchmark results {bundle} -> {name} derived_cache_files={copied}", flush=True)
 upload_model(name, path=bundle, progress_bar=True)
 print("[LIGHTNING] Upload complete", flush=True)

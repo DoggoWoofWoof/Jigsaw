@@ -1,0 +1,73 @@
+{
+  "audit_version": "mag_hash_collision_v1",
+  "canonicalization": "binary active indices else np.round(x,4); str(tuple); md5 mod 1e6",
+  "canonical_identity": "sha256 of the exact pre-md5 canonical byte string",
+  "production_label_crosscheck_mismatches": 0,
+  "feature_dimension": 128,
+  "homogeneous_feature_dimension": 140,
+  "node_type_order": [
+    "author",
+    "field_of_study",
+    "institution",
+    "paper"
+  ],
+  "edge_type_order": [
+    [
+      "author",
+      "affiliated_with",
+      "institution"
+    ],
+    [
+      "author",
+      "writes",
+      "paper"
+    ],
+    [
+      "paper",
+      "cites",
+      "paper"
+    ],
+    [
+      "paper",
+      "has_topic",
+      "field_of_study"
+    ]
+  ],
+  "featured_paper_nodes": {
+    "scope": "featured_paper_nodes",
+    "nodes": 736389,
+    "distinct_canonical_representations": 736380,
+    "distinct_hash_codes": 521393,
+    "colliding_hash_buckets": 168258,
+    "canonical_representations_in_colliding_buckets": 383245,
+    "excess_representations_from_modulo_collisions": 214987,
+    "colliding_representation_rate": 0.5204446074037861,
+    "excess_collision_rate": 0.29195116651728725,
+    "nodes_in_colliding_buckets": 383249,
+    "node_exposure_rate": 0.5204436785448995,
+    "duplicate_nodes_beyond_unique_representations": 9,
+    "node_types": [
+      "paper"
+    ]
+  },
+  "all_serving_nodes": {
+    "scope": "all_serving_nodes",
+    "nodes": 1939743,
+    "distinct_canonical_representations": 742524,
+    "distinct_hash_codes": 524328,
+    "colliding_hash_buckets": 170486,
+    "canonical_representations_in_colliding_buckets": 388682,
+    "excess_representations_from_modulo_collisions": 218196,
+    "colliding_representation_rate": 0.5234605211414042,
+    "excess_collision_rate": 0.2938571682531474,
+    "nodes_in_colliding_buckets": 666847,
+    "node_exposure_rate": 0.3437811091469334,
+    "duplicate_nodes_beyond_unique_representations": 1197219,
+    "node_types": [
+      "author",
+      "field_of_study",
+      "institution",
+      "paper"
+    ]
+  }
+}

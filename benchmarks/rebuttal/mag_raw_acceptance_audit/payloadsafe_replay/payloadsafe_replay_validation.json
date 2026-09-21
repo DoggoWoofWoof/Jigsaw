@@ -1,0 +1,8 @@
+{
+  "replayed_acceptances": 82,
+  "returned_mapping_pairs": 3880,
+  "query_pruning_source": "query_payload_v1",
+  "signature": "type_feat32",
+  "raw_feature_mismatches": 0,
+  "status": "pass"
+}

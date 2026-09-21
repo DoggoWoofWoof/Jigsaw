@@ -22,6 +22,8 @@
 %%  proposition theorem environment -- do not redeclare those.)
 \usepackage[most]{tcolorbox}
 \usepackage{multirow}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
 \newtcolorbox{guaranteebox}[1][What Jigsaw guarantees]{colback=black!3,colframe=black!60,
   boxrule=0.5pt,left=6pt,right=6pt,top=5pt,bottom=5pt,arc=2pt,
   fonttitle=\bfseries,title={#1}}
@@ -39,7 +41,7 @@
 \email{swastik9895@gmail.com}
 
 \begin{abstract}
-Exact subgraph matching enumerates every embedding of a small attributed query graph in a large data graph, and it underpins graph databases, knowledge-graph search, and program analysis. Exact solvers are memory-bound: run over the whole graph, the Glasgow Subgraph Solver enumerates all 15 test queries on Cora (20K nodes) but none once the graph reaches OGBN-Arxiv scale (169K nodes), and a million-node graph does not fit in memory at all. We present \textbf{Jigsaw}, a retrieval-constrained matcher that keeps exact matching feasible under a fixed memory budget. Jigsaw partitions the data graph offline, retrieves a small set of candidate partitions per query with a coverage-trained encoder, expands them by one-hop boundary overlap, prunes by typed signature and exact label, and invokes the exact solver only inside the retrieved candidate. The guarantee is precise: every returned mapping is an exact match within the retrieved candidate under a configured discrete label semantics, verified by the solver alone, and the memory budget $K$ trades recall for footprint but never soundness; a bounded no-match result is not a certificate of global non-existence. On OGBN-MAG (1.9M nodes) Jigsaw solves \textbf{88.6\%} of 1{,}800 planted positives while a two-pass streaming implementation holds \textbf{2.4}\,GB instead of \textbf{10.2}\,GB for whole-graph residence ($4.2\times$ less). Because the value of learning depends on label selectivity, Jigsaw routes retrieval by an offline selectivity statistic: a classical label index dominates when labels are near-unique (96.7\% on MAG) and the coverage-trained encoder dominates under realistic class labels. We report both rather than a single winner, turning retrieval into a practical execution layer for exact verification rather than a neural replacement for it.
+Exact subgraph matching enumerates every embedding of a small attributed query graph in a large data graph, and it underpins graph databases, knowledge-graph search, and program analysis. Exact solvers are memory-bound: run over the whole graph, the Glasgow Subgraph Solver enumerates all 15 test queries on CoraFull (19.8K nodes) but none once the graph reaches OGBN-Arxiv scale (169K nodes), and at a million nodes holding the graph together with the solver's candidate domains resident becomes impractical. We present \textbf{Jigsaw}, a retrieval-constrained matcher that keeps exact matching feasible under a fixed memory budget. Jigsaw partitions the data graph offline, retrieves a small set of candidate partitions per query with a coverage-trained encoder, expands them by one-hop boundary overlap, prunes by typed signature and exact label, and invokes the exact solver only inside the retrieved candidate. The guarantee is precise: every returned mapping is an exact match within the retrieved candidate under a configured discrete label semantics, verified by the solver alone, and the memory budget $K$ trades recall for footprint but never soundness; a bounded no-match result is not a certificate of global non-existence. On OGBN-MAG (1.9M nodes) Jigsaw solves \textbf{88.6\%} of 1{,}800 planted positives while a two-pass streaming implementation holds \textbf{2.4}\,GB instead of \textbf{10.2}\,GB for whole-graph residence ($4.2\times$ less). Because the value of learning depends on label selectivity, Jigsaw routes retrieval by an offline selectivity statistic: a classical label index dominates when labels are near-unique (96.7\% on MAG) and the coverage-trained encoder dominates under realistic class labels. We report both rather than a single winner, turning retrieval into a practical execution layer for exact verification rather than a neural replacement for it.
 \end{abstract}
 
 \maketitle
@@ -55,11 +57,11 @@ Subgraph isomorphism is a basic tool for motif discovery, scientific graph analy
 
 We call this design \emph{retrieval-constrained verification}. Jigsaw partitions a large graph, embeds queries and partitions in a shared space, retrieves a bounded set of partitions, stitches their overlap neighborhoods, prunes by typed structural signatures and exact labels, and then calls the verifier. If the candidate contains a valid embedding, Glasgow can certify it exactly. Missing a required region limits global completeness but cannot create a false match. FullCov trains the retriever against that specific failure event by requiring coverage of every partition touched by the planted match.
 
-We evaluate the full path across Cora, OGBN-Arxiv, and MAG using two locked seeds, three sizes, six positive and two negative families, and six retrieval policies. At the same half-partition retrieval budgets, overlap-aware training lifts Arxiv from $74\%$ to $93\%$, Cora remains near saturation at $94\%$, and the deployed MAG retriever reaches $88.6\%$. Examining every partition reaches $100\%$ on Cora/Arxiv but remains a recall ceiling, not a scalable policy.
+We evaluate the full path across CoraFull, OGBN-Arxiv, and MAG using two locked seeds, three sizes, six positive and two negative families, and six retrieval policies. At matched half-partition budgets the full cascade solves $94.2/92.8/88.6\%$ of planted positives on CoraFull/Arxiv/MAG (Table~\ref{tab:production_matrix}). Two operators put it there: coverage-aware training improves the fixed-budget retrieval operating points (Table~\ref{tab:loss_ablation}), and one-hop boundary overlap is the load-bearing recall step (Table~\ref{tab:design_ablation}). Examining every partition reaches $100\%$ on CoraFull/Arxiv but is a recall ceiling, not a scalable policy.
 
 \paragraph{Contributions.}
 \begin{itemize}
-    \item We \textbf{scale} exact subgraph matching to million-node graphs: direct constraint-programming Glasgow solves 0/15 MAG queries, while retrieval-constrained verification reaches $88.6\%$. Partition-wise streaming holds $2.4$\,GB instead of the $10.2$\,GB needed for whole-graph residence ($4.2\times$).
+    \item We turn exact matching into a \textbf{memory-bounded service}: partition-wise streaming verifies OGBN-MAG (1.9M nodes) within a $2.4$\,GB budget versus $10.2$\,GB for whole-graph residence ($4.2\times$ less) and exposes a tunable memory--latency frontier that resident and prior learned-exact matchers do not. Under this budget, retrieval-constrained verification recovers $88.6\%$ of the $1{,}800$ planted MAG positives, where a direct whole-graph Glasgow call solves $0/15$ of the K-hop timeout control (Table~\ref{tab:scaling_latency}); the same substitution turns Arxiv's direct $0/15$ into $15/15$.
     \item We formulate the pipeline as coverage-conditioned exact verification, separating verifier soundness under the configured label semantics (always guaranteed) from retrieval completeness (a tunable budget knob), and prove the pruning stage is coverage-lossless.
     \item We introduce \textbf{FullCov}, which targets the weakest required partitions: Conditional Value-at-Risk (CVaR) averages the largest tail of their losses, and a top-$K$ barrier penalizes those below the retrieval cutoff.
     \item We provide a two-seed, three-dataset benchmark with positive and negative query families, exact-verification metrics, and an audited evaluation, measuring each candidate-shrinkage stage to show that boundary overlap is essential for recall while query-derived pruning preserves every covered match.
@@ -72,7 +74,7 @@ Let $G=(V,E,X)$ be a large attributed data graph and $Q=(V_Q,E_Q,X_Q)$ a query g
 
 \begin{guaranteebox}[What Jigsaw guarantees]
 Fix a data graph $G$, query $Q$, label semantics $\sigma$, and memory budget $K$; Jigsaw returns a set $M$ of embeddings of $Q$ into $G$.
-\textbf{(i)~Soundness.} Every $m\in M$ is an exact embedding under $\sigma$, certified by the Glasgow verifier on $G_C$ alone; no learned component can accept a match. Under the default attribute-hash $\sigma$ a certified match already requires the full raw attributes to agree, which we confirm by direct audit (below).
+\textbf{(i)~Soundness.} Every $m\in M$ is an exact embedding under $\sigma$, certified by the Glasgow verifier on $G_C$ alone; no learned component can accept a match. The default $\sigma$ is an attribute hash, so acceptance is exact \emph{under $\sigma$} by construction; raw-attribute exactness is stronger, holds empirically on this benchmark (audited below), and is guaranteed by construction only with the optional raw-equality guard enabled.
 \textbf{(ii)~Candidate-local completeness.} $M$ contains every embedding whose image lies inside the retrieved candidate $G_C$; matching-invariant pruning removes no valid embedding (Proposition~\ref{prop:lossless}).
 \textbf{(iii)~Budget monotonicity.} Enlarging $K$ can only grow $G_C$, hence $M$, and never admits a spurious match; at $K=|\mathcal{P}|$ every partition is admitted and the run is complete under $\sigma$ whenever the verifier finishes.
 Jigsaw does \emph{not} certify global non-existence: an empty $M$ means ``no match inside $G_C$,'' not ``no match in $G$.'' Recall of true matches is an empirical quantity we measure, not a worst-case bound.
@@ -89,7 +91,7 @@ Partition recall@$K$ is $|\mathcal{T}(Q)\cap R_K(Q)|/|\mathcal{T}(Q)|$; FullCov@
 Soundness never depends on $K$: any returned match is a true match at every budget, so $K$ is a pure completeness control. At $K=|\mathcal{P}|$ (FilterAll) retrieval covers the whole partition set and matching-invariant pruning preserves every valid embedding, so the run is complete under $\sigma$ whenever the verifier finishes. As $K$ shrinks, the solved-by-budget curves of Section~\ref{sec:results} measure realized completeness under the timeout. A caller needing certainty pays for all partitions and sufficient verifier time; one needing speed accepts a quantified miss/timeout rate.
 
 \paragraph{Label semantics and why acceptance is exact.}
-The verifier consumes discrete labels $\sigma(v)$; by default we set $\sigma(v)=\mathrm{md5}(x_v)\bmod 10^{6}$, a hash of the full node attributes. Discretization is used only to shrink the retrieval and pruning domain. Because pruning is matching-invariant (Proposition~\ref{prop:lossless}), a hash collision can only enlarge the candidate the verifier inspects, never create a false accept. Under this $\sigma$ a certified match already requires the full raw attributes to hash-agree, so $\sigma$-exactness should coincide with raw-attribute exactness; we verify this directly, auditing every accepted mapping across all $1{,}800$ MAG positives ($101{,}951$ mapped node pairs) and finding exact raw-attribute agreement with zero collisions. A drop-in raw-attribute equality guard on each returned mapping makes acceptance exact by construction for any $\sigma$. Section~\ref{sec:results} additionally reports a coarser $39$-class label regime, which stresses selectivity and motivates the retriever portfolio.
+The verifier consumes discrete labels $\sigma(v)$; by default we set $\sigma(v)=\mathrm{md5}(x_v)\bmod 10^{6}$, a hash of the full node attributes. Discretization is used only to shrink the retrieval and pruning domain, and because pruning is matching-invariant (Proposition~\ref{prop:lossless}) a hash collision can only enlarge the candidate the verifier inspects, never remove a valid embedding. Two exactness notions must be separated. Under $\sigma$-semantics the Glasgow certificate is exact by definition. Raw-attribute exactness is stronger, and the modular hash \emph{does} collide: across MAG's $742{,}524$ distinct node representations, $\mathrm{md5}\bmod 10^{6}$ yields only $524{,}328$ distinct codes, so $52.3\%$ of representations share a bucket and $34.4\%$ of nodes fall in a colliding bucket. A $\sigma$-certified mapping onto a collided node would be $\sigma$-exact but not necessarily raw-exact. We address this in two ways: (a) we audit every accepted mapping ($1{,}595$ solved positives, $87{,}536$ mapped node pairs) and find zero raw-attribute mismatches on this benchmark---an empirical result on the tested queries, not a worst-case bound; and (b) a drop-in raw-attribute equality guard on each returned mapping restores raw-exactness by construction for any $\sigma$. (Separately, a dataset-integrity check confirms all $1{,}800$ planted witnesses, $101{,}951$ pairs.) Section~\ref{sec:results} additionally reports a coarser $39$-class label regime, which stresses selectivity and motivates the retriever portfolio.
 
 \section{Jigsaw Method}
 \label{sec:method}
@@ -101,16 +103,34 @@ The verifier consumes discrete labels $\sigma(v)$; by default we set $\sigma(v)=
 \label{fig:pipeline}
 \end{figure*}
 
-Figure~\ref{fig:pipeline} gives the dataflow. Offline, METIS partitions $G$ into fine and coarse blocks; the shared encoder embeds every coarse block once and FAISS indexes the normalized vectors. Online, Jigsaw embeds the query, retrieves coarse blocks, stitches boundaries, prunes, and verifies.
+Figure~\ref{fig:pipeline} gives the dataflow. Offline, METIS partitions $G$ into fine and coarse blocks; the shared encoder embeds every coarse block once and FAISS indexes the normalized vectors. Online, Jigsaw embeds the query, retrieves coarse blocks, stitches boundaries, prunes, and verifies (Algorithm~\ref{alg:serving}).
 
 \paragraph{Hierarchical localization and overlap cascade.}
 Fine blocks give local structure; coarse blocks are the retrieval units. For each query Jigsaw computes $z_Q=f_\theta(Q)$ and ranks all coarse partitions by cosine similarity to the cached partition embeddings, retrieving the top $K$. True query neighborhoods often cross hard partition boundaries, so Jigsaw stitches each retrieved partition with its one-hop boundary nodes from adjacent partitions -- not the adjacent partitions in full -- raising recall before verification while still avoiding whole-graph search.
 
 \paragraph{Pruning and verification.}
-The stitched region is filtered by typed structural signatures (matching coarse type and feature fingerprints) and exact labels before Glasgow verification; connected components become independent verifier calls. Both token sets are derived exclusively from the submitted query payload -- planted target-node IDs are evaluation metadata and never enter candidate construction or serving-time pruning. Only the exact verifier returns a match. As a running example, suppose a planted query touches blocks $p_4$ and $p_7$: if both rank in the top $K$, FullCov holds; if only $p_4$ ranks but the required nodes of $p_7$ lie on its boundary, overlap still completes the candidate; if an interior node of $p_7$ is never admitted, the bounded run may miss the match but cannot return an invalid one.
+The stitched region is filtered by typed attribute signatures (node type plus hashed feature fingerprints) and exact labels before Glasgow verification; connected components become independent verifier calls. Both token sets are derived exclusively from the submitted query payload -- planted target-node IDs are evaluation metadata and never enter candidate construction or serving-time pruning. Only the exact verifier returns a match. As a running example, suppose a planted query touches blocks $p_4$ and $p_7$: if both rank in the top $K$, FullCov holds; if only $p_4$ ranks but the required nodes of $p_7$ lie on its boundary, overlap still completes the candidate; if an interior node of $p_7$ is never admitted, the bounded run may miss the match but cannot return an invalid one.
+
+\begin{algorithm}[t]
+\caption{Jigsaw online serving (one query)}
+\label{alg:serving}
+\begin{algorithmic}[1]
+\Require target $G$ partitioned into coarse blocks $\mathcal{P}$ with cached embeddings $\{p_j\}$ and FAISS index; encoder $f_\theta$; query $Q$; budget $K$; label map $\sigma$
+\Ensure set $M$ of exact embeddings of $Q$ inside the retrieved candidate
+\State $z_Q \gets f_\theta(Q)$ \Comment{embed query}
+\State $R \gets \textsc{TopK}(\mathrm{cos}(z_Q,\{p_j\}),\,K)$ \Comment{retrieve coarse blocks}
+\State $G_C \gets \bigcup_{p\in R} p \,\cup\, \textsc{OneHopBoundary}(R)$ \Comment{stitch boundary overlap}
+\State $G_C' \gets \{\,v\in G_C : \sigma(v)\in\sigma(V_Q)\ \wedge\ \mathrm{sig}(v)\in\mathrm{sig}(V_Q)\,\}$ \Comment{lossless prune (Prop.~\ref{prop:lossless})}
+\State $M \gets \emptyset$
+\For{each connected component $C$ of $G_C'$}
+  \State $M \gets M \cup \textsc{Glasgow}(Q,C)$ \Comment{exact verify; sole accepting step}
+\EndFor
+\State \Return $M$
+\end{algorithmic}
+\end{algorithm}
 
 \paragraph{FullCov objective.}
-Standard contrastive training~\cite{ref_cpc} rewards high average similarity to positives, which can still leave one required partition ranked too low; Jigsaw optimizes the bottleneck. For query $i$, let $P_i$ be its required partitions and $u_{ij}=z_i^\top p_j/\tau_{\mathrm{cov}}$. Each positive $j\in P_i$ receives
+Standard contrastive training~\cite{ref_cpc} rewards high average similarity to positives, which can still leave one required partition ranked too low; Jigsaw optimizes the bottleneck. For query $i$, let $P_i$ be its required partitions and $u_{ij}=z_i^\top p_j/\tau_{\mathrm{cov}}$ the temperature-scaled similarity to partition $j$ ($\tau_{\mathrm{cov}}$ a fixed temperature). Each positive $j\in P_i$ receives
 \begin{equation}
 \begin{aligned}
 c_{ij}&=-\log\frac{e^{u_{ij}}}{\sum_m e^{u_{im}}},\qquad
@@ -118,21 +138,25 @@ h_i=\max_{n\notin P_i}u_{in},\\[2pt]
 \ell_{ij}&=c_{ij}+0.25\,\mathrm{softplus}(h_i-u_{ij}).
 \end{aligned}
 \end{equation}
-For tail fraction $\rho$, $\mathrm{CVaR}_{\rho}$~\cite{ref_cvar} averages the largest $\lceil \rho|P_i|\rceil$ losses, so easy positives cannot hide the weakest one; a top-$K$ barrier $b_{ij}=\mathrm{softplus}(t_i(K)-u_{ij})$ pushes borderline positives above the cutoff $t_i(K)$. The coverage loss is
+For tail fraction $\rho$, $\mathrm{CVaR}_{\rho}$~\cite{ref_cvar} averages the largest $\lceil \rho|P_i|\rceil$ losses, so easy positives cannot hide the weakest one; a top-$K$ barrier $b_{ij}=\mathrm{softplus}(t_i(K)-u_{ij})$ pushes borderline positives above the cutoff $t_i(K)$, defined as the similarity of the $K$-th ranked partition for query $i$ (the retrieval boundary a positive must clear). The coverage loss is
 \begin{equation}
 \mathcal{L}_{\mathrm{cov}}=\mathrm{CVaR}_{\rho}(\{\ell_{ij}\})+0.35\,\mathrm{CVaR}_{\rho}(\{b_{ij}\}).
 \end{equation}
-The complete objective adds level-specific contrastive terms, $0.2\,\mathcal{L}_{\mathrm{fine\text{-}NCE}}+0.8\,\mathcal{L}_{\mathrm{coarse\text{-}NCE}}+\mathcal{L}_{\mathrm{cov}}$: the coarse term dominates because coarse partitions are the retrieval unit the verifier consumes, the fine term shapes the same space at finer granularity, and node-alignment terms are switched off (weight $0$) because node embeddings are unused at query time. Arxiv uses $K{=}20$, $\rho{=}0.25$; MAG uses $K{=}50$, $\rho{=}0.5$ to reflect its larger footprints. The $\min$ (and its CVaR relaxation) follows from the metric: FullCov is a conjunction, so failure is governed by the worst-ranked required partition, not the average -- exactly the failure exact verification cannot tolerate.
+The complete objective adds level-specific contrastive terms,
+\begin{equation}
+\mathcal{L}=0.2\,\mathcal{L}_{\mathrm{fine\text{-}NCE}}+0.8\,\mathcal{L}_{\mathrm{coarse\text{-}NCE}}+\mathcal{L}_{\mathrm{cov}},
+\end{equation}
+where the coarse term dominates because coarse partitions are the retrieval unit the verifier consumes, the fine term shapes the same space at finer granularity, and node-alignment terms are switched off (weight $0$) because node embeddings are unused at query time. The coefficients (the $0.25$ margin, the $0.35$ barrier, and the $0.2/0.8$ fine/coarse split) are held fixed across datasets; only the budget $K$ and tail fraction $\rho$ vary (Arxiv $K{=}20$, $\rho{=}0.25$; MAG $K{=}50$, $\rho{=}0.5$, reflecting its larger footprints). Optimizing the tail rather than the average follows from the metric: FullCov is a conjunction over required partitions, so a query fails as soon as its worst-ranked required partition leaves the budget---a $\min$ over required partitions in the hard limit, of which $\mathrm{CVaR}_{\rho}$ is a smooth relaxation. That worst case is exactly the failure exact verification cannot tolerate.
 
 \subsection{Encoder architecture}
 \label{sec:encoder}
 
-The encoder is shared between query and partition graphs: node features are projected to $256$ dimensions, passed through six residual message-passing blocks with LayerNorm, and read out by multi-layer mean/max/sum pooling into an $L_2$-normalized $128$-d vector. This matters because the task is region localization, not node alignment: the model must place a query near \emph{every} partition needed for verification, including the farthest true one. For Cora and Arxiv the block is GraphSAGE~\cite{ref_graphsage}. OGBN-MAG is heterogeneous (paper/author/institution/field nodes, typed relations); we flatten to a single index but retain node and relation types through a six-layer RGCN~\cite{ref_rgcn} (per-relation bases over symmetrized relations). Since only paper nodes carry features, others receive node-type one-hot and per-relation-degree features, so the retriever reasons over typed structure. The residual connections and LayerNorm are not incidental: Section~\ref{sec:depth} shows they are what keeps a six-layer encoder from oversmoothing. The architecture does not make the retriever a solver; it proposes a candidate boundary, and once $G_C$ is built Glasgow gives exact answers for $G_C$.
+The encoder is shared between query and partition graphs: node features are projected to $256$ dimensions, passed through six residual message-passing blocks with LayerNorm, and read out by multi-layer mean/max/sum pooling into an $L_2$-normalized $128$-d vector (Figure~\ref{fig:encoder}). This matters because the task is region localization, not node alignment: the model must place a query near \emph{every} partition needed for verification, including the farthest true one. For CoraFull and Arxiv the block is GraphSAGE~\cite{ref_graphsage}. OGBN-MAG is heterogeneous (paper/author/institution/field nodes, typed relations); we flatten to a single index but retain node and relation types through a six-layer RGCN~\cite{ref_rgcn} (per-relation bases over symmetrized relations). Since only paper nodes carry features, others receive node-type one-hot and per-relation-degree features, so the retriever reasons over typed structure. The residual connections and LayerNorm are not incidental: Section~\ref{sec:depth} shows they are what keeps a six-layer encoder from oversmoothing. The architecture does not make the retriever a solver; it proposes a candidate boundary, and once $G_C$ is built Glasgow gives exact answers for $G_C$.
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=\columnwidth]{fig_encoder_architecture.png}
-\caption{\textbf{Shared query/partition encoder.} One network embeds both queries and cached partitions into a common space: six residual GraphSAGE blocks for Cora/Arxiv, a relation-aware RGCN for MAG, pooled to an $L_2$-normalized vector and scored by cosine similarity.}
+\caption{\textbf{Shared query/partition encoder.} One network embeds both queries and cached partitions into a common space: six residual GraphSAGE blocks for CoraFull/Arxiv, a relation-aware RGCN for MAG, pooled to an $L_2$-normalized vector and scored by cosine similarity.}
 \label{fig:encoder}
 \end{figure}
 
@@ -140,7 +164,7 @@ The encoder is shared between query and partition graphs: node features are proj
 \label{sec:protocol}
 
 \paragraph{Datasets.}
-We evaluate Cora~\cite{ref_cora} (small enough for exact timing sanity checks), OGBN-Arxiv~\cite{ref_ogb} ($169{,}343$ nodes, the medium-scale benchmark), and the full heterogeneous OGBN-MAG ($1{,}939{,}743$ nodes across four node types joined by typed relations), which we model relation-aware rather than collapsing to attribute-only structure, stressing both scale and heterogeneity.
+We evaluate CoraFull~\cite{ref_cora} (small enough for exact timing sanity checks), OGBN-Arxiv~\cite{ref_ogb} ($169{,}343$ nodes, the medium-scale benchmark), and the full heterogeneous OGBN-MAG ($1{,}939{,}743$ nodes across four node types joined by typed relations), which we model relation-aware rather than collapsing to attribute-only structure, stressing both scale and heterogeneity.
 
 \paragraph{Queries and policies.}
 All positive families are generated as connected planted subgraphs. The matrix uses two query seeds, sizes $20/50/100$, and $50$ queries per type/size/seed. Positive families are single, multi-fine, K-hop, degree-K-hop, random-walk, and multi-coarse; negatives perturb labels or structure. Retrieval policies are learned Jigsaw, MeanFeat, Mean-RRF (reciprocal-rank fusion of learned and MeanFeat rankings, a configuration of our retriever), TopoFeat, Random, and exhaustive FilterAll; on MAG we additionally run FeatureIndex, a classical label-coverage index. Model selection is protocol-disjoint: the deployed MAG encoder is the checkpoint chosen by validation FullCov on seeds $31415/27182$, while all benchmark queries use seeds $20260607/20260608$, so no benchmark query influenced training, weighting, or checkpoint choice.
@@ -189,7 +213,7 @@ Table~\ref{tab:production_matrix} reports exact planted-match recovery, correct 
 
 \begin{table*}[t]
 \centering
-\caption{\textbf{Main-benchmark metrics.} Pos. uses matched half-partition budgets $K{=}10/100/1000$; FilterAll uses the all-partition ceiling. Neg. is audited no-match accuracy; FP counts negative false positives, while TO counts positive-query solver timeouts (FeatureIndex was run on positives only). Candidate and timing columns use the same endpoint as Pos. Cascade time is candidate construction plus exact verification and excludes retrieval/ranking.}
+\caption{\textbf{Main-benchmark metrics.} Pos. uses matched half-partition budgets $K{=}10/100/1000$; FilterAll uses the all-partition ceiling. Neg. is audited no-match accuracy; FP counts negative false positives, while TO counts positive-query solver timeouts (FeatureIndex was run on positives only). Candidate and timing columns use the same endpoint as Pos. Cascade time is candidate construction plus exact verification and excludes retrieval/ranking. Bold marks Jigsaw, the proposed method (not necessarily the per-column maximum); FilterAll is the unbounded exhaustive ceiling and FeatureIndex applies only under near-unique labels.}
 \label{tab:production_matrix}
 \setlength{\tabcolsep}{6pt}
 \small
@@ -197,14 +221,14 @@ Table~\ref{tab:production_matrix} reports exact planted-match recovery, correct 
 \toprule
 \textbf{Dataset} & \textbf{Method} & \textbf{Pos. \%} & \textbf{Neg. \%} & \textbf{FP} & \textbf{TO} & \textbf{Cand. nodes} & \textbf{Cascade s} & \textbf{Solver ms} \\
 \midrule
-Cora & Jigsaw & 94.2 & 100.0 & 0 & 0 & 458 & 0.05 & 11.8 \\
-Cora & Mean-RRF & 93.8 & 100.0 & 0 & 0 & 485 & 0.05 & 11.8 \\
-Cora & MeanFeat & 87.7 & 100.0 & 0 & 0 & 1.13K & 0.06 & 10.5 \\
-Cora & TopoFeat & 31.9 & 100.0 & 0 & 0 & 7.60K & 0.17 & 3.6 \\
-Cora & Random & 32.7 & 100.0 & 0 & 0 & 7.54K & 0.16 & 3.8 \\
-Cora & FilterAll$^\ddagger$ & 100.0 & 100.0 & 0 & 0 & 59 & 0.06 & 12.7 \\
+CoraFull & Jigsaw & \textbf{94.2} & 100.0 & 0 & 0 & 458 & 0.05 & 11.8 \\
+CoraFull & Mean-RRF & 93.8 & 100.0 & 0 & 0 & 485 & 0.05 & 11.8 \\
+CoraFull & MeanFeat & 87.7 & 100.0 & 0 & 0 & 1.13K & 0.06 & 10.5 \\
+CoraFull & TopoFeat & 31.9 & 100.0 & 0 & 0 & 7.60K & 0.17 & 3.6 \\
+CoraFull & Random & 32.7 & 100.0 & 0 & 0 & 7.54K & 0.16 & 3.8 \\
+CoraFull & FilterAll$^\ddagger$ & 100.0 & 100.0 & 0 & 0 & 59 & 0.06 & 12.7 \\
 \midrule
-Arxiv & Jigsaw & 92.8 & 100.0 & 0 & 0 & 77 & 0.19 & 18.3 \\
+Arxiv & Jigsaw & \textbf{92.8} & 100.0 & 0 & 0 & 77 & 0.19 & 18.3 \\
 Arxiv & Mean-RRF & 94.0 & 100.0 & 0 & 0 & 75 & 0.19 & 18.8 \\
 Arxiv & MeanFeat & 89.7 & 100.0 & 0 & 0 & 91 & 0.22 & 18.4 \\
 Arxiv & TopoFeat & 33.3 & 100.0 & 0 & 0 & 233 & 0.46 & 6.0 \\
@@ -213,7 +237,7 @@ Arxiv & FilterAll$^\ddagger$ & 100.0 & 100.0 & 0 & 0 & 57 & 0.35 & 19.1 \\
 \midrule
 MAG & Jigsaw & \textbf{88.6} & 99.5 & 1 & 25 & 138.1K & 6.97 & 81.9 \\
 MAG & Mean-RRF & 85.4 & 99.5 & 1 & 17 & 137.1K & 5.38 & 67.9 \\
-MAG & FeatureIndex$^\S$ & \textbf{96.7} & -- & -- & 24 & 59.4K & 2.39 & 118.8 \\
+MAG & FeatureIndex$^\S$ & 96.7 & -- & -- & 24 & 59.4K & 2.39 & 118.8 \\
 MAG & MeanFeat & 64.6 & 99.5 & 1 & 12 & 212.1K & 8.02 & 27.5 \\
 MAG & TopoFeat & 37.1 & 99.8 & 1 & 1 & 235.6K & 8.07 & 5.2 \\
 MAG & Random & 51.4 & 99.7 & 1 & 9 & 282.1K & 9.54 & 19.9 \\
@@ -224,21 +248,21 @@ MAG & FilterAll$^\ddagger$ & 98.4 & 99.3 & 1 & 33 & 443.8K & 5.85 & 288.6 \\
 \footnotesize $^\ddagger$Exhaustive all-partition ceiling (not a bounded-memory policy). $^\S$Classical label-coverage index; positives only.
 \end{table*}
 
-At the half-partition budget (Table~\ref{tab:production_matrix}) Jigsaw solves $94.2/92.8/88.6\%$ on Cora/Arxiv/MAG. The $100\%$ Cora/Arxiv entries are the exhaustive ceiling, not a retrieval result; Mean-RRF is competitive there, and FeatureIndex is strongest on MAG under near-unique labels. Matched Cora/Arxiv costs are measured for every policy: Jigsaw uses mean terminal candidates $458/77$, cascade times $0.05/0.19$\,s, and verifier times $11.8/18.3$\,ms. Size $100$ is harder (Cora $89.0\%$ vs. $96.8/96.8\%$ at $20/50$; Arxiv $90.3\%$ vs. $93.8/94.2\%$), driven by Cora random-walk ($75.3\%$) and Arxiv multi-coarse ($78.7\%$). On MAG, recovery declines from $93.2\%$ at size $20$ to $90.7\%$ at $50$ and $82.0\%$ at $100$, driven by random-walk, while contained multi-fine remains perfect at every size and multi-coarse remains difficult. Jigsaw sends far fewer candidate nodes than FilterAll ($138$K vs $444$K) at lower verifier time ($82$ vs $289$\,ms), while FilterAll remains the recall ceiling at $98.4\%$.
+At the half-partition budget (Table~\ref{tab:production_matrix}) Jigsaw solves $94.2/92.8/88.6\%$ on CoraFull/Arxiv/MAG. The $100\%$ CoraFull/Arxiv entries are the exhaustive ceiling, not a retrieval result; Mean-RRF is competitive there, and FeatureIndex is strongest on MAG under near-unique labels. Matched CoraFull/Arxiv costs are measured for every policy: Jigsaw uses mean terminal candidates $458/77$, cascade times $0.05/0.19$\,s, and verifier times $11.8/18.3$\,ms. Size $100$ is harder (CoraFull $89.0\%$ vs. $96.8/96.8\%$ at $20/50$; Arxiv $90.3\%$ vs. $93.8/94.2\%$), driven by CoraFull random-walk ($75.3\%$) and Arxiv multi-coarse ($78.7\%$). On MAG, recovery declines from $93.2\%$ at size $20$ to $90.7\%$ at $50$ and $82.0\%$ at $100$, driven by random-walk, while contained multi-fine remains perfect at every size and multi-coarse remains difficult. Jigsaw sends far fewer candidate nodes than FilterAll ($138$K vs $444$K) at lower verifier time ($82$ vs $289$\,ms), while FilterAll remains the recall ceiling at $98.4\%$.
 
 \paragraph{The scaling break.}
-The central systems result is that whole-graph exact matching does not scale: direct CP-based Glasgow solves all $15$ Cora K-hop queries but \textbf{0 of 15} on Arxiv and MAG (Table~\ref{tab:scaling_latency}, Figure~\ref{fig:scaling}), whereas the Jigsaw cascade remains feasible by handing the verifier a small candidate. The retriever therefore sits on a recall--cost frontier: FeatureIndex is strongest under near-unique MAG labels, FilterAll is the exhaustive ceiling, and the learned retriever is a useful memory-bounded point, especially once labels coarsen.
+The central systems result is that whole-graph exact matching does not scale: direct CP-based Glasgow solves all $15$ CoraFull K-hop queries but \textbf{0 of 15} on Arxiv and MAG (Table~\ref{tab:scaling_latency}, Figure~\ref{fig:scaling}), whereas the Jigsaw cascade remains feasible by handing the verifier a small candidate. The retriever therefore sits on a recall--cost frontier: FeatureIndex is strongest under near-unique MAG labels, FilterAll is the exhaustive ceiling, and the learned retriever is a useful memory-bounded point, especially once labels coarsen.
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=\columnwidth]{fig_scaling_feasibility.png}
-\caption{\textbf{Jigsaw makes the exact solver's domain tractable.} Direct full-graph Glasgow solves Cora but none of the Arxiv/MAG K-hop samples; Jigsaw stays feasible by verifying only the retrieved-and-pruned candidate.}
+\caption{\textbf{Jigsaw makes the exact solver's domain tractable.} Direct full-graph Glasgow solves CoraFull but none of the Arxiv/MAG K-hop samples; Jigsaw stays feasible by verifying only the retrieved-and-pruned candidate.}
 \label{fig:scaling}
 \end{figure}
 
 \begin{table}[t]
 \centering
-\caption{\textbf{Scaling and latency: direct full-graph solver vs.\ Jigsaw cascade.} Cora/Arxiv use the same 15 K-hop queries; Jigsaw is evaluated at matched half-partition budgets ($K{=}10/100$). The MAG direct cell is its 15-query timeout control; $^\ast$the MAG Jigsaw cell is the 1,800-positive main-benchmark mean at $K{=}1{,}000$.}
+\caption{\textbf{Scaling and latency: direct full-graph solver vs.\ Jigsaw cascade.} CoraFull/Arxiv use the same 15 K-hop queries; Jigsaw is evaluated at matched half-partition budgets ($K{=}10/100$). The MAG direct cell is its 15-query timeout control; $^\ast$the MAG Jigsaw cell is the 1,800-positive main-benchmark mean at $K{=}1{,}000$.}
 \label{tab:scaling_latency}
 \small
 \resizebox{\columnwidth}{!}{%
@@ -248,7 +272,7 @@ The central systems result is that whole-graph exact matching does not scale: di
 \cmidrule(lr){3-4}\cmidrule(lr){5-6}
 Dataset & Nodes & Solved & Med.\ time & Solved & Med.\ time & nodes \\
 \midrule
-Cora  & 19.8K & 15/15 & $2.74$\,s & 15/15 & $\mathbf{0.03}$\,s & 50 \\
+CoraFull  & 19.8K & 15/15 & $2.74$\,s & 15/15 & $\mathbf{0.03}$\,s & 50 \\
 Arxiv & 169K  & \textbf{0/15}$^\dagger$ & ${\approx}49$\,s & 15/15 & $\mathbf{0.11}$\,s & 50 \\
 MAG   & 1.9M  & \textbf{0/15} & timeout & 88.6\% & $6.97$\,s$^\ast$ & -- \\
 \bottomrule
@@ -256,7 +280,7 @@ MAG   & 1.9M  & \textbf{0/15} & timeout & 88.6\% & $6.97$\,s$^\ast$ & -- \\
 \end{table}
 
 \paragraph{Label-selectivity crossover.}
-Near-unique md5 labels favor exact-label methods: a classical label-coverage index (\textbf{FeatureIndex}, in the GraphGrep~\cite{ref_graphgrep}/gIndex~\cite{ref_gindex} tradition) is the strongest bounded retriever here ($96.7\%$; median worst-true-partition rank $104$ of $2{,}000$) versus the learned GNN ($88.6\%$; rank ${\sim}900$). At coarse $39$-class labels this ranking order \emph{inverts}: the learned model has better worst-true-partition ranks in each family, while complete solve runs are statistically tied (FeatureIndex $63.4\%$; learned variants $63$--$64\%$). This isolates the regime in which learning contributes: as labels stop localizing, the GNN supplies the better partition ranking. The crossover generalizes on Cora and Arxiv, where the winner flips with an offline label-selectivity statistic (median partitions/label $1$ at feature labels versus $12$/$124.5$ at class labels), so Jigsaw selects its bounded retriever by label regime (Table~\ref{tab:selectivity_xd_ecml}). Jigsaw is therefore \emph{retriever-agnostic}: it routes to a classical index under near-unique labels and to the learned ranker when labels cease to localize.
+Near-unique md5 labels favor exact-label methods: a classical label-coverage index (\textbf{FeatureIndex}, in the GraphGrep~\cite{ref_graphgrep}/gIndex~\cite{ref_gindex} tradition) is the strongest bounded retriever here ($96.7\%$; median worst-true-partition rank $104$ of $2{,}000$) versus the learned GNN ($88.6\%$; rank ${\sim}900$). At coarse $39$-class labels this ranking order \emph{inverts}: the learned model has better worst-true-partition ranks in each family, while complete solve runs are statistically tied (FeatureIndex $63.4\%$; learned variants $63$--$64\%$). This isolates the regime in which learning contributes: as labels stop localizing, the GNN supplies the better partition ranking. The crossover generalizes on CoraFull and Arxiv, where the winner flips with an offline label-selectivity statistic (median partitions/label $1$ at feature labels versus $12$/$124.5$ at class labels), so Jigsaw selects its bounded retriever by label regime (Table~\ref{tab:selectivity_xd_ecml}). Jigsaw is therefore \emph{retriever-agnostic}: it routes to a classical index under near-unique labels and to the learned ranker when labels cease to localize.
 
 \begin{table}[t]
 \centering
@@ -270,7 +294,7 @@ Near-unique md5 labels favor exact-label methods: a classical label-coverage ind
 \cmidrule(lr){2-3}
 Dataset (parts) & feature & class & (any) & feat / class \\
 \midrule
-Cora ($20$)   & 2 & 7   & 5  & $1$ / $12$ \\
+CoraFull ($20$)   & 2 & 7   & 5  & $1$ / $12$ \\
 Arxiv ($200$) & 4 & 104 & 44 & $1$ / $124.5$ \\
 \bottomrule
 \end{tabular}}
@@ -281,7 +305,7 @@ Table~\ref{tab:significance} reports bootstrap confidence intervals and paired e
 
 \begin{table}[t]
 \centering
-\caption{\textbf{MAG solve-rate significance.} Bootstrap 95\% CI over $n{=}1800$ positive queries, and paired exact-McNemar of Jigsaw vs each policy (wins = queries Jigsaw solves and the other does not).}
+\caption{\textbf{MAG solve-rate significance.} Bootstrap 95\% CI over $n{=}1800$ positive queries, and paired exact-McNemar of Jigsaw vs each policy (wins = queries Jigsaw solves and the other does not). The header solve rate and CI are the deployed encoder ($88.6\%$, $1{,}595/1{,}800$); in the paired column Mean-RRF is compared against that deployed run, while MeanFeat/Random/Topo/FilterAll are compared against the encoder-independent Jigsaw run ($86.0\%$, $1{,}548/1{,}800$).}
 \label{tab:significance}
 \small
 \setlength{\tabcolsep}{6pt}
@@ -306,19 +330,19 @@ The same low-selectivity transition breaks resident exact matchers. With MAG lab
 \subsection{Memory-Bounded Serving}
 \label{sec:memory}
 
-The headline systems benefit is memory. The cascade streams the graph in a two-pass sweep (nodes, then edges) behind an LRU partition cache, so peak resident memory is bounded by the cache rather than by $|G|$. On a $54$-query MAG grid (6 families $\times$ 3 sizes $\times$ 3 queries) the conservative primary serve peaks at \textbf{2.4}\,GB versus \textbf{10.2}\,GB for whole-graph residence ($4.2\times$ smaller), while recovering $46/54$ matches; an optimized cache sweep lowers the eight-partition point to $1.9$\,GB ($5.4\times$). Memory becomes a tunable resource: as the cache grows from $8$ to $256$ partitions, MAG p50 latency falls $5.9{\to}4.8$\,s (below the $8.4$\,s cold load) while the mean holds $17.9{\to}17.6$\,s because of a hard-query I/O tail (Figure~\ref{fig:memory_latency}c). Cold-load end-to-end latency is competitive with resident classical matchers -- $2.35/3.0/1.2\times$ faster on Cora/Arxiv/MAG because Jigsaw avoids the full-graph load -- so bounding residence does not cost latency. An all-or-nothing resident matcher cannot expose this frontier: it must hold the whole graph or fail, whereas Jigsaw lets the operator pick a memory$\leftrightarrow$latency point.
+The headline systems benefit is memory. The cascade streams the graph in a two-pass sweep (nodes, then edges) behind an LRU partition cache, so peak resident memory is bounded by the cache rather than by $|G|$. On a $54$-query MAG grid (6 families $\times$ 3 sizes $\times$ 3 queries) the conservative primary serve peaks at \textbf{2.4}\,GB versus \textbf{10.2}\,GB for whole-graph residence ($4.2\times$ smaller), while recovering $46/54$ matches; an optimized cache sweep lowers the eight-partition point to $1.9$\,GB ($5.4\times$). Memory becomes a tunable resource: as the cache grows from $8$ to $256$ partitions, MAG p50 latency falls $5.9{\to}4.8$\,s (below the $8.4$\,s cold load) while the mean holds $17.9{\to}17.6$\,s because of a hard-query I/O tail (Figure~\ref{fig:memory_latency}c). Cold-load end-to-end latency is competitive with resident classical matchers -- $2.35/3.0/1.2\times$ faster on CoraFull/Arxiv/MAG because Jigsaw avoids the full-graph load -- so bounding residence does not cost latency for cold or one-shot queries. A resident matcher, by contrast, amortizes its one-time load and then answers in ${\sim}1$\,ms, so on long repeated-query streams its steady state is faster; Jigsaw's decisive advantage is memory, not latency. An all-or-nothing resident matcher cannot expose this frontier: it must hold the whole graph or fail, whereas Jigsaw lets the operator pick a memory$\leftrightarrow$latency point.
 
 \begin{figure*}[t]
 \centering
 \includegraphics[width=0.92\textwidth]{fig_memory_latency.png}
-\caption{\textbf{Memory is the primary benefit; cold-load latency is competitive and the tradeoff is tunable.} \textbf{(a)} The conservative streaming serve is $4.2\times$ smaller on MAG ($2.4$ vs $10.2$\,GB); the optimized cache sweep lowers its eight-partition point to $1.9$\,GB ($5.4\times$). \textbf{(b)} Cold-load latency, Jigsaw vs.\ classical CFL/DP-iso/GQL: $2.35/3.0/1.2\times$ faster on Cora/Arxiv/MAG ($^\dagger$MAG resident enumeration is ${\sim}1$\,ms after loading). \textbf{(c)} MAG memory$\leftrightarrow$latency frontier as the cache grows ($8{\to}256$): more memory buys down p50 ($5.9{\to}4.8$\,s) while the mean stays ${\approx}17.6$--$17.9$\,s because of a hard-query I/O tail.}
+\caption{\textbf{Memory is the primary benefit; cold-load latency is competitive and the tradeoff is tunable.} \textbf{(a)} The conservative streaming serve is $4.2\times$ smaller on MAG ($2.4$ vs $10.2$\,GB); the optimized cache sweep lowers its eight-partition point to $1.9$\,GB ($5.4\times$). \textbf{(b)} Cold-load latency, Jigsaw vs.\ classical CFL/DP-iso/GQL: $2.35/3.0/1.2\times$ faster on CoraFull/Arxiv/MAG ($^\dagger$MAG resident enumeration is ${\sim}1$\,ms after loading). \textbf{(c)} MAG memory$\leftrightarrow$latency frontier as the cache grows ($8{\to}256$): more memory buys down p50 ($5.9{\to}4.8$\,s) while the mean stays ${\approx}17.6$--$17.9$\,s because of a hard-query I/O tail.}
 \label{fig:memory_latency}
 \end{figure*}
 
 \subsection{Encoder Depth, Oversmoothing, and Residual Necessity}
 \label{sec:depth}
 
-Because Jigsaw depends on a six-layer message-passing encoder, a natural concern is oversmoothing: whether depth collapses node and partition representations. We probe the \emph{deployed} weights (no retrain) and measure, at every layer, node-level mean absolute deviation (MAD $=1-$ mean off-diagonal cosine; $\to 0$ is collapse) and the retrieval-relevant quantity -- effective rank and mean pairwise distance of the mean-pooled \emph{partition} summaries FAISS actually discriminates (Table~\ref{tab:oversmoothing}).
+Because Jigsaw depends on a six-layer message-passing encoder, a natural concern is oversmoothing: whether depth collapses node and partition representations. We probe the \emph{deployed} weights (no retrain) and measure, at every layer, node-level mean absolute deviation (MAD $=1-$ mean off-diagonal cosine; $\to 0$ is collapse) and the retrieval-relevant quantity -- effective rank and mean pairwise distance of the mean-pooled \emph{partition} summaries FAISS actually discriminates (Table~\ref{tab:oversmoothing}, Figure~\ref{fig:oversmoothing}).
 
 \begin{table}[t]
 \centering
@@ -332,7 +356,7 @@ Because Jigsaw depends on a six-layer message-passing encoder, a natural concern
 \cmidrule(lr){2-3}
 Dataset (enc.) & input & L6 & input$\to$L6 & L6 node cos \\
 \midrule
-Cora (SAGE)  & 15.2 & 14.8 & $0.054{\to}0.112$ & 0.965 (collapse) \\
+CoraFull (SAGE)  & 15.2 & 14.8 & $0.054{\to}0.112$ & 0.965 (collapse) \\
 Arxiv (SAGE) & 65.0 & 87.5 & $0.026{\to}0.163$ & 0.951 (collapse) \\
 MAG (RGCN)   & 74.5 & 118.9 & $0.062{\to}0.088$ & 0.586 (robust) \\
 \bottomrule
@@ -342,11 +366,11 @@ MAG (RGCN)   & 74.5 & 118.9 & $0.062{\to}0.088$ & 0.586 (robust) \\
 \begin{figure}[t]
 \centering
 \includegraphics[width=\columnwidth]{fig_oversmoothing.png}
-\caption{\textbf{The six-layer encoder does not oversmooth.} Per-layer partition-summary discriminability (the quantity retrieval uses) on the deployed weights: it is preserved on Cora, rises with depth on Arxiv and MAG, and only collapses when residual connections are disabled on the GraphSAGE encoders -- isolating the residual as the anti-collapse mechanism.}
+\caption{\textbf{The six-layer encoder does not oversmooth.} Per-layer partition-summary discriminability (the quantity retrieval uses) on the deployed weights: it is preserved on CoraFull, rises with depth on Arxiv and MAG, and only collapses when residual connections are disabled on the GraphSAGE encoders -- isolating the residual as the anti-collapse mechanism.}
 \label{fig:oversmoothing}
 \end{figure}
 
-Three findings result. \textbf{(1) No oversmoothing at six layers on any dataset.} Partition summaries stay fully discriminable and in fact separate \emph{more} with depth: Cora partition distance rises $0.054{\to}0.112$, and MAG partition rank rises $74.5{\to}118.9$ with distance $0.062{\to}0.088$. \textbf{(2) On Arxiv, depth actively helps} -- every metric improves monotonically (node MAD $0.15{\to}0.59$, partition distance $0.026{\to}0.163$, $+240\%$), so six layers are justified rather than harmful. \textbf{(3) Residual connections are the mechanism} on the GraphSAGE encoders: disabling them collapses Cora and Arxiv to the textbook regime (layer-6 node cosine $0.965$/$0.951$), whereas the MAG RGCN's per-relation weighting already keeps nodes apart (residual-off cosine $0.586$, no collapse). We therefore keep residual $+$ LayerNorm everywhere for exactly the reason the GraphSAGE case demonstrates. Together with the FullCov objective ablation (Table~\ref{tab:loss_ablation}), this shows the learned component is a well-posed, depth-justified localizer, not a fragile black box.
+Three findings result. \textbf{(1) No oversmoothing at six layers on any dataset.} Partition summaries stay fully discriminable and in fact separate \emph{more} with depth: CoraFull partition distance rises $0.054{\to}0.112$, and MAG partition rank rises $74.5{\to}118.9$ with distance $0.062{\to}0.088$. \textbf{(2) On Arxiv, depth actively helps} -- every metric improves monotonically (node MAD $0.15{\to}0.59$, partition distance $0.026{\to}0.163$, $+240\%$), so six layers are justified rather than harmful. \textbf{(3) Residual connections are the mechanism} on the GraphSAGE encoders: disabling them collapses CoraFull and Arxiv to the textbook regime (layer-6 node cosine $0.965$/$0.951$), whereas the MAG RGCN's per-relation weighting already keeps nodes apart (residual-off cosine $0.586$, no collapse). We therefore keep residual $+$ LayerNorm everywhere for exactly the reason the GraphSAGE case demonstrates. Together with the FullCov objective ablation (Table~\ref{tab:loss_ablation}), this shows the learned component is a well-posed, depth-justified localizer, not a fragile black box.
 
 \subsection{Candidate-Shrinkage Cascade and Boundary Overlap}
 \label{sec:shrinkage}
@@ -357,7 +381,7 @@ A natural objection is that one-hop overlap might expand to most of the graph. W
 \]
 on $14{,}400$ positive method/model-query evaluation records over the $1{,}800$-query MAG positive grid. Three facts emerge.
 
-\textbf{(1) Overlap is broad, but ranking still removes most of the graph.} The median selected-overlap union is $59\%$ of MAG for Jigsaw, yet after identical pruning the candidate is $84.5$K nodes versus $544$K for FilterAll, a $6.4\times$ median reduction.
+\textbf{(1) Overlap is broad, but ranking still removes most of the graph.} The median selected-overlap union is $59\%$ of MAG for Jigsaw, yet after identical pruning the candidate is a median $84.5$K nodes versus $544$K for FilterAll, a $6.4\times$ median reduction (this per-query cascade diagnostic uses the generic-mix encoder over $14{,}400$ records and reports medians; the deployed-encoder \emph{means} are $138$K vs $444$K in Table~\ref{tab:production_matrix}).
 
 \textbf{(2) Pruning is coverage-lossless.} Recall loss occurs at retrieval/overlap, not attribute pruning:
 
@@ -367,7 +391,7 @@ Let the pruning token $\sigma(\cdot)$ be a node attribute the matching semantics
 \end{proposition}
 \emph{Proof.} For $q\in V_Q$, $\sigma(\phi(q))=\sigma(q)\in\sigma(V_Q)$, so $\phi(q)$ meets the keep condition and is retained. Thus every matched node survives.\hfill$\square$
 
-The cascade signatures and exact-label filters are attribute invariants, so the proposition applies. Empirically, planted-match survival after overlap equals survival after pruning for every policy (Jigsaw $87\%$ both), so the solve ceiling is set by whether the retrieved-plus-overlapped region contains the match. \textbf{(3) Candidate construction dominates latency:} mean build is $3.4$\,s for Jigsaw and $5.5$\,s for FilterAll versus $0.25$\,s of solving.
+The cascade signatures and exact-label filters are pure functions of each node's stored attribute vector---node type, hashed feature bits, and (on MAG) quantized per-relation-degree \emph{features} carried verbatim in the query payload, never the query's structural degree recomputed on $Q$---so they are preserved under embedding and the proposition applies. Empirically, planted-match survival after overlap equals survival after pruning for every policy (Jigsaw $87\%$ both), so the solve ceiling is set by whether the retrieved-plus-overlapped region contains the match. \textbf{(3) Candidate construction dominates latency:} mean build is $3.4$\,s for Jigsaw and $5.5$\,s for FilterAll versus $0.25$\,s of solving.
 
 \paragraph{Boundary overlap is an essential recall operator.}
 Removing boundary overlap cuts solve rate from $88.9\%$ to $44.4\%$ on MAG and from $94.4\%$ to $86.1\%$ on Arxiv. Its benefit is strongest for compact local structure: boundary expansion recovers missed true partitions for $94\%$ of K-hop queries but $62\%$ of random-walk queries, whose matches more often extend into the interior of an unselected partition. With coverage-lossless pruning, this locates the remaining errors before verification, when retrieval plus boundary overlap does not cover the match.
@@ -385,7 +409,7 @@ Removing boundary overlap cuts solve rate from $88.9\%$ to $44.4\%$ on MAG and f
 \toprule
 \textbf{Dataset} & \textbf{Single} & \textbf{K-hop} & \textbf{Deg-K} & \textbf{Walk} & \textbf{Multi-fine} & \textbf{Multi-coarse} & \textbf{Neg-label} & \textbf{Neg-struct} \\
 \midrule
-Cora & 100.0 & 98.3 & 97.3 & 75.3 & 100.0 & 94.3 & 100.0 & 100.0 \\
+CoraFull & 100.0 & 98.3 & 97.3 & 75.3 & 100.0 & 94.3 & 100.0 & 100.0 \\
 Arxiv & 100.0 & 97.3 & 98.3 & 82.3 & 100.0 & 78.7 & 100.0 & 100.0 \\
 MAG & 98.7 & 93.3 & 92.7 & 71.0 & 100.0 & 76.0 & 100.0 & 99.0 \\
 \bottomrule
@@ -400,19 +424,19 @@ The cascade needs multiple operators. At matched budgets, removing overlap lower
 \subsection{Negative Queries and Soundness}
 \label{sec:soundness}
 
-Jigsaw never accepts from the neural model alone; Glasgow is the only accepting step. Audited no-match accuracy is $100.0\%$ for Cora/Arxiv and $99.3$--$99.8\%$ across MAG policies, with at most one false positive per method; the remaining errors are timeout/unknown outcomes. The rare false positives are benchmark-level, not verifier hallucinations: a returned mapping is a true isomorphism inside the candidate, but a perturbed ``negative'' may still match elsewhere. The reported metric is audited no-match accuracy under this synthetic protocol; global non-existence would require exhaustive full-graph certification, which Jigsaw does not claim.
+Jigsaw never accepts from the neural model alone; Glasgow is the only accepting step. Audited no-match accuracy is $100.0\%$ for CoraFull/Arxiv and $99.3$--$99.8\%$ across MAG policies, with at most one false positive per method; the remaining errors are timeout/unknown outcomes. The rare false positives are benchmark-level, not verifier hallucinations: a returned mapping is a true isomorphism inside the candidate, but a perturbed ``negative'' may still match elsewhere. The reported metric is audited no-match accuracy under this synthetic protocol; global non-existence would require exhaustive full-graph certification, which Jigsaw does not claim.
 
 \section{Related Work}
 \label{sec:related}
 
 \paragraph{Exact matchers and in-memory systems.}
-Subgraph isomorphism is NP-complete~\cite{ref_garey}. Backtracking matchers from Ullmann~\cite{ref_ullmann} and VF2/VF3~\cite{ref_vf2,ref_vf3} through RI~\cite{ref_ri}, LAD~\cite{ref_lad}, TurboISO~\cite{ref_turboiso}, CFL-Match~\cite{ref_cflmatch}, DP-iso~\cite{ref_daf}, and GraphQL~\cite{ref_graphql} improve ordering and pruning, and constraint programming yields the strong Glasgow solver~\cite{ref_glasgow} we adopt as the accepting authority. In-depth studies~\cite{ref_survey,ref_survey2024} show these systems are competitive but assume the data graph and its candidate domains are memory-resident -- exactly the assumption that fails at million-node scale and that Jigsaw removes. Worst-case-optimal joins~\cite{ref_wcoj} and GPU matchers~\cite{ref_gsi} attack the join cost rather than residence.
+Subgraph isomorphism is NP-complete~\cite{ref_garey}. Backtracking matchers from Ullmann~\cite{ref_ullmann} and VF2/VF3~\cite{ref_vf2,ref_vf3} through RI~\cite{ref_ri}, LAD~\cite{ref_lad}, TurboISO~\cite{ref_turboiso}, CFL-Match~\cite{ref_cflmatch}, DP-iso~\cite{ref_daf}, GraphQL~\cite{ref_graphql}, and the more recent VEQ~\cite{ref_veq}, RapidMatch~\cite{ref_rapidmatch}, and CECI~\cite{ref_ceci} improve ordering, pruning, and candidate indexing, and constraint programming yields the strong Glasgow solver~\cite{ref_glasgow} we adopt as the accepting authority. In-depth studies~\cite{ref_survey,ref_survey2024} show these systems are competitive but assume the data graph and its candidate domains are memory-resident -- exactly the assumption that fails at million-node scale and that Jigsaw removes. Worst-case-optimal joins~\cite{ref_wcoj} and GPU matchers~\cite{ref_gsi} attack the join cost rather than residence.
 
 \paragraph{Scale, low memory, and distribution.}
 Trinity~\cite{ref_trinity} matches on billion-node graphs with a distributed memory cloud; DualSim~\cite{ref_dualsim} enumerates on a single machine by paging from disk; low-memory dataflows~\cite{ref_lowmem} and G-thinker~\cite{ref_gthinker} shard or stream the whole graph across a cluster. These stream or distribute \emph{the entire graph}; Jigsaw instead pays a one-time partition/index cost and bounds residence by learned relevance, exposing a complementary single-machine memory frontier.
 
 \paragraph{Learned matching and indexing.}
-Neural approaches predict matches or similarity: NeuroMatch~\cite{ref_neuromatch}, GLSearch~\cite{ref_glsearch}, subgraph counting~\cite{ref_nsic}, SimGNN~\cite{ref_simgnn}, GMN~\cite{ref_gmn}, partition-based hierarchical matching~\cite{ref_psimgnn}, and the ISONET line~\cite{ref_isonet,ref_isonetpp,ref_neuraldesign,ref_neugn}. GNN-PE~\cite{ref_gnnpe} builds path-dominance embeddings for exact matching. These typically target smaller or contained queries and, crucially, let the network decide matches. Jigsaw differs in role: the GNN chooses \emph{where} to verify and never accepts a match, so exactness is independent of model quality. Classical structure indices GraphGrep~\cite{ref_graphgrep} and gIndex~\cite{ref_gindex} inspire our FeatureIndex baseline, which we show wins precisely when labels are near-unique. Jigsaw builds on standard components -- GraphSAGE~\cite{ref_graphsage}/RGCN~\cite{ref_rgcn} encoders, METIS partitioning~\cite{ref_metis}, FAISS retrieval~\cite{ref_faiss}, contrastive learning~\cite{ref_cpc}, CVaR~\cite{ref_cvar}, and reciprocal-rank fusion~\cite{ref_rrf} -- and composes them into a retrieval-constrained exact matcher.
+Most neural approaches predict matches or similarity and let the network decide acceptance: NeuroMatch~\cite{ref_neuromatch}, GLSearch~\cite{ref_glsearch}, subgraph counting~\cite{ref_nsic}, SimGNN~\cite{ref_simgnn}, GMN~\cite{ref_gmn}, partition-based hierarchical matching~\cite{ref_psimgnn}, and the ISONET line~\cite{ref_isonet,ref_isonetpp,ref_neuraldesign,ref_neugn}; these typically target smaller or contained queries and trade exactness for a learned score. A second group keeps exactness and uses learning only to prune: GNN-PE~\cite{ref_gnnpe} builds path-dominance embeddings that filter candidates with no false dismissals and then verify exactly, at path granularity and on graphs larger than MAG, and is the closest system to ours. Jigsaw shares that filter-then-verify discipline -- the GNN chooses \emph{where} to verify and Glasgow alone accepts, so exactness is independent of model quality -- but differs in three ways: it retrieves at partition/region granularity rather than per path, it targets \emph{memory-bounded} serving with a tunable memory--latency frontier that GNN-PE and the resident matchers do not expose, and it trades a global no-false-dismissal guarantee for a budget-controlled completeness dial. We run the public GNN-PE release as a transfer diagnostic (Appendix~\ref{app:gnnpe}); a matched-scale head-to-head is future work. Classical structure indices GraphGrep~\cite{ref_graphgrep} and gIndex~\cite{ref_gindex} inspire our FeatureIndex baseline, which we show wins precisely when labels are near-unique. Jigsaw builds on standard components -- GraphSAGE~\cite{ref_graphsage}/RGCN~\cite{ref_rgcn} encoders, METIS partitioning~\cite{ref_metis}, FAISS retrieval~\cite{ref_faiss}, contrastive learning~\cite{ref_cpc}, CVaR~\cite{ref_cvar}, and reciprocal-rank fusion~\cite{ref_rrf} -- and composes them into a retrieval-constrained exact matcher.
 
 \section{Discussion and Limitations}
 \label{sec:limits}
@@ -420,12 +444,12 @@ Neural approaches predict matches or similarity: NeuroMatch~\cite{ref_neuromatch
 Jigsaw is an exact-verification system with a learned search boundary. Retrieval coverage controls completeness while Glasgow preserves sound acceptance inside every candidate; FullCov makes that boundary measurable and trainable. The design targets static attributed graphs and repeated query workloads where partitioning, embeddings, and FAISS indexes amortize; a classical index leads under near-unique labels and learned retrieval becomes the better localizer as labels coarsen, which is why Jigsaw ships both behind an offline selectivity router.
 
 \paragraph{Scope and non-goals.}
-We compare against feature/structure index rankers, no-retrieval Glasgow, exhaustive FilterAll, uninformed retrievers, and scalable CFL-Match/DP-iso/GQL controls; these locate Jigsaw's advantage in bounded residence and low-selectivity candidate construction. Jigsaw does \emph{not} certify global non-existence -- a bounded no-match is not a proof no match exists in $G$ -- and the current benchmark uses planted connected subgraphs on static, single-topology citation graphs, so multi-topology and dynamic-graph generalization remain open. The walk family is the standing recall bottleneck, and the inference-time probes locate its residual errors in representation-level footprint coverage, giving a concrete next learning target. Out-of-core and distributed matchers remain complementary: combining Jigsaw's learned residence bound with sharded verification is promising future work.
+We compare against feature/structure index rankers, no-retrieval Glasgow, exhaustive FilterAll, uninformed retrievers, and scalable CFL-Match/DP-iso/GQL controls; these locate Jigsaw's advantage in bounded residence and low-selectivity candidate construction. We do not yet benchmark the most recent in-memory matchers (VEQ, RapidMatch, CECI); like the resident controls we do run, they assume whole-graph residence, so a matched head-to-head at million-node scale is the natural next comparison rather than a threat to the residence argument. Jigsaw does \emph{not} certify global non-existence -- a bounded no-match is not a proof no match exists in $G$ -- and the current benchmark uses planted connected subgraphs on static, single-topology citation graphs, so multi-topology and dynamic-graph generalization remain open. The walk family is the standing recall bottleneck, and the inference-time probes locate its residual errors in representation-level footprint coverage, giving a concrete next learning target. Out-of-core and distributed matchers remain complementary: combining Jigsaw's learned residence bound with sharded verification is promising future work.
 
 \section{Conclusion}
 \label{sec:conclusion}
 
-Jigsaw turns learned graph retrieval into an execution mechanism for exact search: the model predicts which regions deserve memory and verification, while Glasgow remains the sole accepting authority. On full MAG this changes the tested operating point from $0/15$ direct CP solves to $88.6\%$ exact positive recovery, while streaming at $2.4$\,GB instead of $10.2$\,GB for whole-graph residence. FullCov aligns learning with the decisive failure event -- missing even one required partition -- while boundary overlap and coverage-lossless pruning make the verifier usable under bounded memory. Under near-unique labels a resident classical index dominates; under weak labels whole-graph candidate construction fails and Jigsaw's bounded candidate supplies the systems advantage, so Jigsaw is retriever-agnostic by construction. The result is exact subgraph verification made usable on million-node graphs without replacing exactness by a neural guess.
+Jigsaw turns learned graph retrieval into an execution mechanism for exact search: the model predicts which regions deserve memory and verification, while Glasgow remains the sole accepting authority. On full MAG this changes the tested operating point from $0/15$ direct solves on the K-hop control to $88.6\%$ exact recovery over $1{,}800$ planted positives, while streaming at $2.4$\,GB instead of $10.2$\,GB for whole-graph residence. FullCov aligns learning with the decisive failure event -- missing even one required partition -- while boundary overlap and coverage-lossless pruning make the verifier usable under bounded memory. Under near-unique labels a resident classical index dominates; under weak labels whole-graph candidate construction fails and Jigsaw's bounded candidate supplies the systems advantage, so Jigsaw is retriever-agnostic by construction. The result is exact subgraph verification made usable on million-node graphs without replacing exactness by a neural guess.
 
 \section*{Acknowledgments}
 Generative AI tools assisted with implementation, experiment orchestration, data-validation scripts, and manuscript language editing. The author reviewed and verified all AI-assisted code, analyses, numerical claims, and text, and takes full responsibility for the final work.
@@ -435,7 +459,7 @@ Generative AI tools assisted with implementation, experiment orchestration, data
 \section{Encoder and Training Details}
 \label{app:encoder}
 
-Beyond the architecture of Section~\ref{sec:encoder} (Figure~\ref{fig:encoder}), the readout is an MLP plus a skip projection before $L_2$ normalization. The message-passing block is GraphSAGE~\cite{ref_graphsage} on Cora/Arxiv -- a matched objective ablation finds it at least as strong as GIN~\cite{ref_gin} at the budgets the cascade uses -- and a relation-aware six-layer RGCN~\cite{ref_rgcn} on MAG (per-relation bases over $2R$ symmetrized relations); non-paper MAG nodes, which lack features, receive node-type one-hot and per-relation-degree features. Training combines three signals: paired fine/coarse InfoNCE, hard negatives, and the FullCov coverage term; positive partitions are live re-encoded so coverage gradients update required positives rather than a stale bank. The MAG checkpoint is selected by validation FullCov (seeds $31415/27182$), disjoint from the benchmark seeds. Queries are inductive with respect to an indexed target and need no fine-tuning; a new target pays a one-time METIS hierarchy, partition-embedding, and FAISS build (Table~\ref{tab:deployment_costs}).
+Beyond the architecture of Section~\ref{sec:encoder} (Figure~\ref{fig:encoder}), the readout is an MLP plus a skip projection before $L_2$ normalization. The message-passing block is GraphSAGE~\cite{ref_graphsage} on CoraFull/Arxiv -- a matched objective ablation finds it at least as strong as GIN~\cite{ref_gin} at the budgets the cascade uses -- and a relation-aware six-layer RGCN~\cite{ref_rgcn} on MAG (per-relation bases over $2R$ symmetrized relations); non-paper MAG nodes, which lack features, receive node-type one-hot and per-relation-degree features. Training combines three signals: paired fine/coarse InfoNCE, hard negatives, and the FullCov coverage term; positive partitions are live re-encoded so coverage gradients update required positives rather than a stale bank. The MAG checkpoint is selected by validation FullCov (seeds $31415/27182$), disjoint from the benchmark seeds. Queries are inductive with respect to an indexed target and need no fine-tuning; a new target pays a one-time METIS hierarchy, partition-embedding, and FAISS build (Table~\ref{tab:deployment_costs}).
 
 \begin{table}[t]
 \centering
@@ -457,7 +481,7 @@ MAG (2,000 coarse) & 110.9\,s & 13.7\,s & ${\sim}3$\,h (5,000 steps) & 21.9\,ms 
 \section{GNN-PE Public-Release Diagnostic}
 \label{app:gnnpe}
 
-Beyond the direct-solver control (Table~\ref{tab:scaling_latency}, $0/15$ on Arxiv/MAG), we ran the public GNN-PE~\cite{ref_gnnpe} release. On Cora the released pipeline passes its self-test but, after class-label export and build repairs, recovers $7/24$ planted positives at edit distance $e{=}4$ ($0/6$ at size $100$). The release exposes an inference path but no supervised training recipe for this protocol, so the number measures public-release transfer, not a retrained reproduction; we report it as a transparency control rather than a head-to-head result.
+Beyond the direct-solver control (Table~\ref{tab:scaling_latency}, $0/15$ on Arxiv/MAG), we ran the public GNN-PE~\cite{ref_gnnpe} release. On CoraFull the released pipeline passes its self-test but, after class-label export and build repairs, recovers $7/24$ planted positives at edit distance $e{=}4$ ($0/6$ at size $100$). The release exposes an inference path but no supervised training recipe for this protocol, so the number measures public-release transfer, not a retrained reproduction; we report it as a transparency control rather than a head-to-head result.
 
 \section{Operator-Necessity Ablation}
 \label{app:design}
@@ -541,7 +565,7 @@ Learned (flat)      & \textbf{99.3} & \textbf{99.7} & \textbf{65.0} \\
 \end{tabular}}
 \end{table}
 
-\begin{thebibliography}{42}
+\begin{thebibliography}{45}
 
 \bibitem[McCreesh et al.(2020)]{ref_glasgow}
 McCreesh, C., Prosser, P., Trimble, J.: The Glasgow Subgraph Solver: Using Constraint Programming to Tackle Hard Subgraph Isomorphism Problem Variants. In: CP 2020, LNCS, vol. 12333, pp. 316--333. Springer (2020)
@@ -579,8 +603,8 @@ Bonnici, V., Giugno, R., Pulvirenti, A., Shasha, D., Ferro, A.: A Subgraph Isomo
 \bibitem[Solnon(2010)]{ref_lad}
 Solnon, C.: AllDifferent-Based Filtering for Subgraph Isomorphism. Artificial Intelligence \textbf{174}(12--13), 850--864 (2010)
 
-\bibitem[Sen et al.(2008)]{ref_cora}
-Sen, P., Namata, G., Bilgic, M., Getoor, L., Galligher, B., Eliassi-Rad, T.: Collective Classification in Network Data. AI Magazine \textbf{29}(3), 93--106 (2008)
+\bibitem[Bojchevski and G\"unnemann(2018)]{ref_cora}
+Bojchevski, A., G\"unnemann, S.: Deep Gaussian Embedding of Graphs: Unsupervised Inductive Learning via Ranking. In: ICLR (2018)
 
 \bibitem[Ying et al.(2020)]{ref_neuromatch}
 Ying, R., et al.: Neural Subgraph Matching. arXiv:2007.03092 (2020)
@@ -605,6 +629,15 @@ Han, M., Kim, H., Gu, G., Park, K., Han, W.S.: Efficient Subgraph Matching: Harm
 
 \bibitem[He and Singh(2008)]{ref_graphql}
 He, H., Singh, A.K.: Graphs-at-a-Time: Query Language and Access Methods for Graph Databases. In: SIGMOD, pp. 405--418 (2008)
+
+\bibitem[Kim et al.(2021)]{ref_veq}
+Kim, H., Choi, Y., Park, K., Lin, X., Hong, S.H., Han, W.S.: Versatile Equivalences: Speeding up Subgraph Query Processing and Subgraph Matching. In: SIGMOD, pp. 925--937 (2021)
+
+\bibitem[Sun et al.(2020)]{ref_rapidmatch}
+Sun, S., Sun, X., Che, Y., Luo, Q., He, B.: RapidMatch: A Holistic Approach to Subgraph Query Processing. Proc. VLDB Endow. \textbf{14}(2), 176--188 (2020)
+
+\bibitem[Bhattarai et al.(2019)]{ref_ceci}
+Bhattarai, B., Liu, H., Huang, H.H.: CECI: Compact Embedding Cluster Index for Scalable Subgraph Matching. In: SIGMOD, pp. 1447--1462 (2019)
 
 \bibitem[Carletti et al.(2018)]{ref_vf3}
 Carletti, V., Foggia, P., Saggese, A., Vento, M.: Challenging the Time Complexity of Exact Subgraph Isomorphism for Huge and Dense Graphs with VF3. IEEE Trans. Pattern Anal. Mach. Intell. \textbf{40}(4), 804--818 (2018)

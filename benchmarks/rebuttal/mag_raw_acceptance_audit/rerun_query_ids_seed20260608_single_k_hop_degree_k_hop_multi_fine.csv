@@ -1,0 +1,16 @@
+query_id,query_type,target_query_size,solved_budget,query_nodes
+degree_k_hop_q20_30,degree_k_hop,20,100,20
+degree_k_hop_q20_36,degree_k_hop,20,500,20
+degree_k_hop_q50_11,degree_k_hop,50,500,50
+degree_k_hop_q50_48,degree_k_hop,50,200,50
+k_hop_q100_14,k_hop,100,200,100
+k_hop_q100_25,k_hop,100,1000,100
+k_hop_q100_4,k_hop,100,1000,100
+k_hop_q20_10,k_hop,20,500,20
+k_hop_q50_31,k_hop,50,500,50
+k_hop_q50_35,k_hop,50,200,50
+k_hop_q50_41,k_hop,50,100,50
+single_q20_10,single,20,50,20
+single_q20_13,single,20,500,20
+single_q20_37,single,20,500,20
+single_q20_6,single,20,100,20

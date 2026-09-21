@@ -1,0 +1,60 @@
+{
+  "cache_families": {
+    "44e026ffd70eb787_queries.pt": [
+      "degree_k_hop",
+      "k_hop",
+      "multi_fine",
+      "single"
+    ],
+    "86d76b2687707326_queries.pt": [
+      "multi_coarse",
+      "random_walk"
+    ],
+    "bca702f664e58aad_queries.pt": [
+      "degree_k_hop",
+      "k_hop",
+      "multi_fine",
+      "single"
+    ],
+    "ec622a8592da29ec_queries.pt": [
+      "multi_coarse",
+      "random_walk"
+    ]
+  },
+  "cache_files": {
+    "44e026ffd70eb787_queries.pt": 600,
+    "86d76b2687707326_queries.pt": 300,
+    "bca702f664e58aad_queries.pt": 600,
+    "ec622a8592da29ec_queries.pt": 300
+  },
+  "cache_keys": [
+    "44e026ffd70eb787",
+    "86d76b2687707326",
+    "bca702f664e58aad",
+    "ec622a8592da29ec"
+  ],
+  "families": {
+    "degree_k_hop": 300,
+    "k_hop": 300,
+    "multi_coarse": 300,
+    "multi_fine": 300,
+    "random_walk": 300,
+    "single": 300
+  },
+  "feature_label_mismatches": 0,
+  "feature_label_pairs_checked": 101951,
+  "pruning_source": "query_payload_v1",
+  "queries_per_family_size": 100,
+  "raw_feature_mismatches": 0,
+  "raw_feature_pairs_checked": 101951,
+  "signature": "type_feat32",
+  "sizes": [
+    20,
+    50,
+    100
+  ],
+  "status": "pass",
+  "type_feat32_mismatches": 0,
+  "type_feat32_pairs_checked": 101951,
+  "unique_positive_queries": 1800
+}

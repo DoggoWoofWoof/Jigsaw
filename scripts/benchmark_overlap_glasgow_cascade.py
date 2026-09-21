@@ -933,12 +933,24 @@ def selective_overlap_for_parts(
     return nodes
 
 
-def prune_nodes_by_signature(nodes, query, signature_tokens, signature_name):
+def prune_nodes_by_signature(
+    nodes,
+    query,
+    signature_tokens,
+    signature_name,
+    planted_query_nodes=None,
+):
     if signature_tokens is None or not nodes:
         return nodes
-    # Keep accumulated nodes whose attribute signature matches a query node.
-    # Query tokens come from the query payload, not planted target/global IDs.
-    query_tokens = derive_query_signature_tokens(query, signature_name)
+    if planted_query_nodes is None:
+        # Serving-time pruning derives tokens from the query payload.
+        query_tokens = derive_query_signature_tokens(query, signature_name)
+    else:
+        # Audit-only replay of the legacy production-positive candidate path.
+        query_tensor = torch.tensor(
+            [int(node) for node in planted_query_nodes], dtype=torch.long
+        )
+        query_tokens = torch.unique(signature_tokens[query_tensor].long())
     node_tensor = torch.tensor(sorted(int(node) for node in nodes), dtype=torch.long)
     keep = torch.isin(signature_tokens[node_tensor].long(), query_tokens)
     return set(node_tensor[keep].tolist())
@@ -1551,6 +1563,7 @@ def run_one_model(
     use_overlap,
     overlap_policy=None,
     label_source="feature",
+    query_pruning_source="query_payload_v1",
     preloaded=None,
     query_workers=1,
     partial_output_prefix=None,
@@ -1686,7 +1699,7 @@ def run_one_model(
             "signature": signature_name or "none",
             "label_source": label_source,
             "class_venue_base": class_venue_base,
-            "query_pruning_source": "query_payload_v1",
+            "query_pruning_source": query_pruning_source,
             "embedding_dim": int(data.x.size(1)) if data.x is not None else 0,
         }
         dump_partition_store(
@@ -1719,14 +1732,27 @@ def run_one_model(
         query_largest_component_nodes = query_component_sizes[0] if query_component_sizes else 0
         query_nodes = [int(node) for node in item["query_nodes"].tolist()]
         true_coarse = set(int(x) for x in item["true_coarse"])
-        # Serving labels are derived from the query payload.  The planted IDs in
-        # item["query_nodes"] remain available only for coverage/accuracy audits.
-        q_labels = derive_query_labels(
-            query,
-            label_source=label_source,
-            class_venue_base=class_venue_base,
-        )
-        query.node_label = torch.tensor(q_labels, dtype=torch.long)
+        planted_signature_nodes = None
+        if query_pruning_source == "planted_target_legacy":
+            # Reconstruct the exact candidate semantics used by the published
+            # positive production run. This mode is only for returned-mapping
+            # audits because planted target IDs are unavailable at serving time.
+            planted_signature_nodes = query_nodes
+            if node_label_full is not None:
+                query_tensor = item["query_nodes"].long()
+                q_labels = [int(x) for x in node_label_full[query_tensor].tolist()]
+                query.node_label = node_label_full[query_tensor]
+            else:
+                q_labels = None
+        else:
+            # Serving labels are derived from the query payload. The planted IDs
+            # remain available only for coverage and accuracy audits.
+            q_labels = derive_query_labels(
+                query,
+                label_source=label_source,
+                class_venue_base=class_venue_base,
+            )
+            query.node_label = torch.tensor(q_labels, dtype=torch.long)
         if not needs_encoder:
             model_ranking, retrieval_time = [], 0.0
         else:
@@ -1764,7 +1790,17 @@ def run_one_model(
         total_candidate_time = 0.0
         cascade_rows = []
 
-        for budget in budgets:
+        query_budgets = budgets
+        if item.get("_evaluation_budget") is not None:
+            evaluation_budget = int(item["_evaluation_budget"])
+            if evaluation_budget not in budgets:
+                raise ValueError(
+                    f"Evaluation budget {evaluation_budget} for {item['query_id']} "
+                    f"is absent from configured budgets {budgets}"
+                )
+            query_budgets = [evaluation_budget]
+
+        for budget in query_budgets:
             candidate_start = time.perf_counter()
             selected = unique_ordered(
                 select_ids_for_budget(
@@ -1798,7 +1834,11 @@ def run_one_model(
                 )
                 overlap_full, overlap_missed_count = node_fullcov(query_nodes, overlap_nodes)
                 pruned_nodes = prune_nodes_by_signature(
-                    overlap_nodes, query, tokens, signature_name
+                    overlap_nodes,
+                    query,
+                    tokens,
+                    signature_name,
+                    planted_query_nodes=planted_signature_nodes,
                 )
                 signature_candidate_nodes = len(pruned_nodes)
                 if prune_query_labels:
@@ -1826,6 +1866,9 @@ def run_one_model(
             target_nodes_count = 0
             component_solver_components = 0
             component_solver_nodes = 0
+            solver_raw_feature_equal = None
+            solver_raw_feature_mismatches = -1
+            solver_mapping_pairs = 0
             if (not skip_solver) and (not require_node_fullcov or pruned_full):
                 candidate_sets = [None] if fullgraph_fast_path else [sorted(pruned_nodes)]
                 if (not fullgraph_fast_path) and component_solve and label_tokens is not None:
@@ -1878,6 +1921,16 @@ def run_one_model(
                         )
                     solver_result_found = bool(solver_result.found)
                     solver_timed_out = bool(solver_result.timed_out)
+                    if solver_result_found and solver_result.best_mapping:
+                        solver_mapping_pairs = len(solver_result.best_mapping)
+                        raw_mismatches = 0
+                        for query_idx, target_idx in solver_result.best_mapping.items():
+                            query_feature = query.x[int(query_idx)].detach().cpu()
+                            target_feature = target_graph.x[int(target_idx)].detach().cpu()
+                            if not torch.equal(query_feature, target_feature):
+                                raw_mismatches += 1
+                        solver_raw_feature_mismatches = raw_mismatches
+                        solver_raw_feature_equal = raw_mismatches == 0
                     if solver_result_found or solver_timed_out:
                         break
 
@@ -1892,7 +1945,7 @@ def run_one_model(
                 "expected_match": bool(item.get("expected_match", True)),
                 "target_query_size": item["target_query_size"],
                 "query_nodes": query.num_nodes,
-                "query_pruning_source": "query_payload_v1",
+                "query_pruning_source": query_pruning_source,
                 "query_component_count": query_component_count,
                 "query_largest_component_nodes": query_largest_component_nodes,
                 "full_graph_nodes": data.num_nodes,
@@ -1937,6 +1990,9 @@ def run_one_model(
                 "candidate_time_seconds": candidate_time,
                 "solver_time_seconds": solver_time,
                 "solver_found": solver_result_found,
+                "solver_raw_feature_equal": solver_raw_feature_equal,
+                "solver_raw_feature_mismatches": solver_raw_feature_mismatches,
+                "solver_mapping_pairs": solver_mapping_pairs,
                 "false_positive": bool(item.get("is_negative", False)) and solver_result_found,
                 "solver_timed_out": solver_timed_out,
                 "skipped_by_node_fullcov_guard": require_node_fullcov and not pruned_full,
@@ -2213,7 +2269,7 @@ def main():
     parser.add_argument("--output-prefix", required=True)
     parser.add_argument("--budgets", default="20,50,100")
     parser.add_argument("--method", choices=["fixed", "hybrid", "all", "random", "mean_feature", "coarse_mean_rrf", "topo_feature", "feature_index"], default="fixed")
-    parser.add_argument("--signature", default="type_rel_feat32")
+    parser.add_argument("--signature", default="type_feat32")
     parser.add_argument("--solver-timeout", type=float, default=5.0)
     parser.add_argument("--glasgow-bin", default=os.environ.get("GLASGOW_SOLVER_BIN", "/usr/local/bin/glasgow_subgraph_solver"))
     parser.add_argument("--stitch-seed-count", type=int, default=20)
@@ -2233,6 +2289,15 @@ def main():
     parser.add_argument("--overlap-bridge-infill-min-support", type=int, default=0, help="minimum total boundary support for a bridge-infill candidate")
     parser.add_argument("--no-boundary-overlap", action="store_true", help="skip one-hop boundary overlap (for bridge-infill-only experiments)")
     parser.add_argument("--label-source", default="feature", help="node label for matching/pruning/feature-index: 'feature'=per-feature-vector hash, 'class'=real class label data.y, 'feature_bucket_K'=MD5(feature tuple) modulo K")
+    parser.add_argument(
+        "--query-pruning-source",
+        choices=["query_payload_v1", "planted_target_legacy"],
+        default="query_payload_v1",
+        help=(
+            "Source for signature and label pruning. planted_target_legacy exists "
+            "only to replay published positive candidates for mapping audits."
+        ),
+    )
     parser.add_argument("--generate-query-cache-only", action="store_true")
     parser.add_argument(
         "--evaluation-query-types",
@@ -2242,6 +2307,14 @@ def main():
             "The cache is still generated and validated from --query-types, so a "
             "canonical all-family cache can drive a targeted rerun without changing "
             "query identities."
+        ),
+    )
+    parser.add_argument(
+        "--evaluation-query-ids-file",
+        default="",
+        help=(
+            "Optional CSV containing a query_id column. After loading the canonical "
+            "cache, evaluate only those exact query IDs."
         ),
     )
     parser.add_argument("--max-eval-queries", type=int, default=0)
@@ -2312,6 +2385,59 @@ def main():
             f"for types={sorted(selected_types)}.",
             flush=True,
         )
+    if args.evaluation_query_ids_file:
+        with open(args.evaluation_query_ids_file, newline="", encoding="utf-8-sig") as handle:
+            reader = csv.DictReader(handle)
+            if not reader.fieldnames or "query_id" not in reader.fieldnames:
+                raise ValueError(
+                    "--evaluation-query-ids-file must be a CSV with a query_id column"
+                )
+            requested_rows = list(reader)
+            requested_ids = [str(row["query_id"]).strip() for row in requested_rows]
+        if not requested_ids or any(not query_id for query_id in requested_ids):
+            raise ValueError("--evaluation-query-ids-file contains no usable query IDs")
+        if len(requested_ids) != len(set(requested_ids)):
+            raise ValueError("--evaluation-query-ids-file contains duplicate query IDs")
+        requested_ids = set(requested_ids)
+        available_ids = {str(item.get("query_id", "")) for item in queries}
+        missing_ids = sorted(requested_ids - available_ids)
+        if missing_ids:
+            raise ValueError(
+                "Requested query IDs are absent from the loaded canonical cache: "
+                f"{missing_ids[:10]}"
+            )
+        original = len(queries)
+        queries = [
+            item for item in queries if str(item.get("query_id", "")) in requested_ids
+        ]
+        if len(queries) != len(requested_ids):
+            raise ValueError(
+                "Filtered query count does not match the query-ID manifest: "
+                f"got={len(queries)} expected={len(requested_ids)}"
+            )
+        request_by_id = {str(row["query_id"]).strip(): row for row in requested_rows}
+        for item in queries:
+            request = request_by_id[str(item.get("query_id", ""))]
+            solved_budget = str(request.get("solved_budget", "")).strip()
+            if solved_budget:
+                item["_evaluation_budget"] = int(solved_budget)
+            expected_type = str(request.get("query_type", "")).strip()
+            if expected_type and str(item.get("query_type", "")) != expected_type:
+                raise ValueError(
+                    f"Query type mismatch for {item.get('query_id')}: "
+                    f"cache={item.get('query_type')} manifest={expected_type}"
+                )
+            expected_nodes = str(request.get("query_nodes", "")).strip()
+            if expected_nodes and int(item["query"].num_nodes) != int(expected_nodes):
+                raise ValueError(
+                    f"Query size mismatch for {item.get('query_id')}: "
+                    f"cache={item['query'].num_nodes} manifest={expected_nodes}"
+                )
+        print(
+            f"[QUERY-ID SUBSET] Using {len(queries)}/{original} cached queries from "
+            f"{args.evaluation_query_ids_file}.",
+            flush=True,
+        )
     if args.max_eval_queries and args.max_eval_queries > 0:
         original = len(queries)
         queries = queries[: args.max_eval_queries]
@@ -2350,6 +2476,7 @@ def main():
                 not args.no_overlap,
                 overlap_policy=overlap_policy,
                 label_source=args.label_source,
+                query_pruning_source=args.query_pruning_source,
                 query_workers=args.query_workers,
                 partial_output_prefix=f"{args.output_prefix}_{clean_tag(label)}",
                 partial_every=args.partial_every,

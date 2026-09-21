@@ -105,7 +105,11 @@ def main() -> None:
     parser.add_argument("--dataset", default="mag")
     parser.add_argument("--queries", type=int, default=50)
     parser.add_argument("--target-sizes", default="20,50,100")
-    parser.add_argument("--query-types", default="all")
+    parser.add_argument(
+        "--query-types",
+        default="all",
+        help="Comma-separated query types, or semicolon-separated canonical query-type groups.",
+    )
     parser.add_argument(
         "--evaluation-query-types",
         default="",
@@ -114,6 +118,19 @@ def main() -> None:
             "--query-types. Query generation and manifest validation still use the "
             "full --query-types specification."
         ),
+    )
+    parser.add_argument(
+        "--evaluation-query-ids-dir",
+        default="",
+        help=(
+            "Optional directory containing rerun_query_ids_seed<seed>.csv files. "
+            "Each task evaluates only the listed canonical query IDs for its seed."
+        ),
+    )
+    parser.add_argument(
+        "--query-pruning-source",
+        choices=["query_payload_v1", "planted_target_legacy"],
+        default="query_payload_v1",
     )
     parser.add_argument("--seeds", default="20260607,20260608")
     parser.add_argument("--methods", default="neural_component,random_component,mean_feature_component,mean_rrf_component,filterall_component")
@@ -126,7 +143,7 @@ def main() -> None:
     )
     parser.add_argument("--budgets", default="20,50,100,200,500,1000")
     parser.add_argument("--full-budget", default="2000")
-    parser.add_argument("--signature", default="type_rel_feat32")
+    parser.add_argument("--signature", default="type_feat32")
     parser.add_argument("--solver-timeout", type=float, default=5.0)
     parser.add_argument("--data-root", default="data")
     parser.add_argument("--cache-dir", default="cache/overlap_cascade")
@@ -163,6 +180,10 @@ def main() -> None:
 
     if args.hierarchy_path and not Path(args.hierarchy_path).exists():
         raise FileNotFoundError(f"Hierarchy not found: {args.hierarchy_path}")
+    if args.evaluation_query_ids_dir and not Path(args.evaluation_query_ids_dir).is_dir():
+        raise FileNotFoundError(
+            f"Evaluation query-ID directory not found: {args.evaluation_query_ids_dir}"
+        )
     methods = [m.strip() for m in args.methods.split(",") if m.strip()]
     if methods and not shutil_which(args.glasgow_bin):
         raise FileNotFoundError(f"Glasgow solver not found: {args.glasgow_bin}")
@@ -173,43 +194,63 @@ def main() -> None:
                 methods.append(m)
 
     seeds = [int(s.strip()) for s in args.seeds.split(",") if s.strip()]
+    query_type_groups = [
+        group.strip() for group in args.query_types.split(";") if group.strip()
+    ]
+    if not query_type_groups:
+        raise ValueError("--query-types contains no query-type group")
     py = sys.executable
 
     # Build query cache once per seed. This makes all methods use the same queries.
     for seed in seeds:
-        if manifest_has_query_cache(args.cache_dir, seed, args.queries, args.target_sizes, args.query_types):
-            print(f"[QUERY CACHE] manifest hit seed={seed}; skipping generation", flush=True)
-            continue
-        if args.run_tag:
-            tag = f"{args.output_prefix}_s{seed}_{clean_tag(args.run_tag)}_query_cache"
-        else:
-            tag = (
-                f"{args.output_prefix}_s{seed}_q{args.queries}_types_{clean_tag(args.query_types)}"
-                f"_sizes{clean_tag(args.target_sizes)}_query_cache"
-            )
-        cmd = [
-            py, "scripts/benchmark_overlap_glasgow_cascade.py",
-            "--dataset", args.dataset,
-            "--queries", str(args.queries),
-            "--target-sizes", args.target_sizes,
-            "--query-types", args.query_types,
-            "--seed", str(seed),
-            "--data-root", args.data_root,
-            "--hierarchy-path", args.hierarchy_path,
-            "--output-prefix", str(result_dir / tag),
-            "--budgets", args.budgets,
-            "--method", "random",
-            "--signature", args.signature,
-            "--solver-timeout", str(args.solver_timeout),
-            "--glasgow-bin", args.glasgow_bin,
-            "--cache-dir", args.cache_dir,
-            "--generate-query-cache-only",
-        ]
-        run_command(tag, cmd, log_dir / f"{tag}.log", root)
+        for query_types in query_type_groups:
+            if manifest_has_query_cache(
+                args.cache_dir, seed, args.queries, args.target_sizes, query_types
+            ):
+                print(
+                    f"[QUERY CACHE] manifest hit seed={seed} types={query_types}; "
+                    "skipping generation",
+                    flush=True,
+                )
+                continue
+            if args.run_tag:
+                tag = (
+                    f"{args.output_prefix}_s{seed}_{clean_tag(args.run_tag)}_"
+                    f"types_{clean_tag(query_types)}_query_cache"
+                )
+            else:
+                tag = (
+                    f"{args.output_prefix}_s{seed}_q{args.queries}_types_{clean_tag(query_types)}"
+                    f"_sizes{clean_tag(args.target_sizes)}_query_cache"
+                )
+            cmd = [
+                py, "scripts/benchmark_overlap_glasgow_cascade.py",
+                "--dataset", args.dataset,
+                "--queries", str(args.queries),
+                "--target-sizes", args.target_sizes,
+                "--query-types", query_types,
+                "--seed", str(seed),
+                "--data-root", args.data_root,
+                "--hierarchy-path", args.hierarchy_path,
+                "--output-prefix", str(result_dir / tag),
+                "--budgets", args.budgets,
+                "--method", "random",
+                "--signature", args.signature,
+                "--solver-timeout", str(args.solver_timeout),
+                "--glasgow-bin", args.glasgow_bin,
+                "--cache-dir", args.cache_dir,
+                "--generate-query-cache-only",
+            ]
+            run_command(tag, cmd, log_dir / f"{tag}.log", root)
 
     tasks = []
     for seed in seeds:
-        for method in methods:
+        query_method_pairs = (
+            (query_types, method)
+            for query_types in query_type_groups
+            for method in methods
+        )
+        for query_types, method in query_method_pairs:
             cascade_method, sig, method_budgets, component_solve, prune_labels, use_overlap, needs_models = method_config(
                 method, args.signature, args.budgets, args.full_budget
             )
@@ -220,7 +261,7 @@ def main() -> None:
                 )
             else:
                 tag = (
-                    f"{args.output_prefix}_s{seed}_q{args.queries}_types_{clean_tag(args.query_types)}"
+                    f"{args.output_prefix}_s{seed}_q{args.queries}_types_{clean_tag(query_types)}"
                     f"_sizes{clean_tag(args.target_sizes)}_{method}_b{clean_tag(method_budgets)}"
                 )
                 if args.evaluation_query_types:
@@ -236,7 +277,7 @@ def main() -> None:
                 "--dataset", args.dataset,
                 "--queries", str(args.queries),
                 "--target-sizes", args.target_sizes,
-                "--query-types", args.query_types,
+                "--query-types", query_types,
                 "--seed", str(seed),
                 "--data-root", args.data_root,
                 "--hierarchy-path", args.hierarchy_path,
@@ -251,6 +292,23 @@ def main() -> None:
             ]
             if args.evaluation_query_types:
                 cmd.extend(["--evaluation-query-types", args.evaluation_query_types])
+            if args.evaluation_query_ids_dir:
+                grouped_query_ids_file = (
+                    Path(args.evaluation_query_ids_dir)
+                    / f"rerun_query_ids_seed{seed}_{clean_tag(query_types)}.csv"
+                )
+                query_ids_file = grouped_query_ids_file
+                if not query_ids_file.is_file() and len(query_type_groups) == 1:
+                    query_ids_file = (
+                        Path(args.evaluation_query_ids_dir)
+                        / f"rerun_query_ids_seed{seed}.csv"
+                    )
+                if not query_ids_file.is_file():
+                    raise FileNotFoundError(
+                        f"Evaluation query-ID manifest not found: {query_ids_file}"
+                    )
+                cmd.extend(["--evaluation-query-ids-file", str(query_ids_file)])
+            cmd.extend(["--query-pruning-source", args.query_pruning_source])
             cmd.extend(OVERLAP_POLICY_FLAGS.get(method, []))
             if args.label_source and args.label_source != "feature":
                 cmd.extend(["--label-source", args.label_source])

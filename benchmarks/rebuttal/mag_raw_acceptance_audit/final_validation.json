@@ -1,0 +1,22 @@
+{
+  "canonical_learned_jigsaw_accepts": 1595,
+  "raw_validated_query_target_pairs": 87536,
+  "candidate_contained_planted_raw_witness": 1513,
+  "returned_mapping_raw_guard_reruns": 82,
+  "returned_mapping_raw_guard_pairs": 3880,
+  "canonical_query_cache_keys": [
+    "44e026ffd70eb787",
+    "86d76b2687707326",
+    "bca702f664e58aad",
+    "ec622a8592da29ec"
+  ],
+  "raw_feature_mismatches": 0,
+  "rerun_family_counts": {
+    "degree_k_hop": 7,
+    "k_hop": 15,
+    "multi_coarse": 21,
+    "random_walk": 32,
+    "single": 7
+  },
+  "status": "pass"
+}

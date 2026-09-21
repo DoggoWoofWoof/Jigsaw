@@ -1,0 +1,301 @@
+{
+  "dataset": "mag",
+  "ncoarse": 2000,
+  "fullcov_budget": 1000,
+  "buckets": [
+    1000000,
+    100000,
+    10000,
+    1000,
+    100,
+    10
+  ],
+  "selectivity": {
+    "1000000": {
+      "median_parts_per_label": 1.0,
+      "distinct_labels": 524328
+    },
+    "100000": {
+      "median_parts_per_label": 7.0,
+      "distinct_labels": 99945
+    },
+    "10000": {
+      "median_parts_per_label": 74.0,
+      "distinct_labels": 10000
+    },
+    "1000": {
+      "median_parts_per_label": 636.0,
+      "distinct_labels": 1000
+    },
+    "100": {
+      "median_parts_per_label": 1938.0,
+      "distinct_labels": 100
+    },
+    "10": {
+      "median_parts_per_label": 2000.0,
+      "distinct_labels": 10
+    }
+  },
+  "n_queries": 1800,
+  "by_family": {
+    "single": {
+      "neural": {
+        "median_rank": 4,
+        "fullcov": 99.33333333333333,
+        "n": 300
+      },
+      "fi_bucket_1000000": {
+        "median_rank": 0,
+        "fullcov": 100.0,
+        "n": 300
+      },
+      "fi_bucket_100000": {
+        "median_rank": 0,
+        "fullcov": 100.0,
+        "n": 300
+      },
+      "fi_bucket_10000": {
+        "median_rank": 0,
+        "fullcov": 100.0,
+        "n": 300
+      },
+      "fi_bucket_1000": {
+        "median_rank": 0,
+        "fullcov": 100.0,
+        "n": 300
+      },
+      "fi_bucket_100": {
+        "median_rank": 655,
+        "fullcov": 76.0,
+        "n": 300
+      },
+      "fi_bucket_10": {
+        "median_rank": 987,
+        "fullcov": 50.666666666666664,
+        "n": 300
+      }
+    },
+    "multi_fine": {
+      "neural": {
+        "median_rank": 2,
+        "fullcov": 99.66666666666667,
+        "n": 300
+      },
+      "fi_bucket_1000000": {
+        "median_rank": 0,
+        "fullcov": 100.0,
+        "n": 300
+      },
+      "fi_bucket_100000": {
+        "median_rank": 0,
+        "fullcov": 100.0,
+        "n": 300
+      },
+      "fi_bucket_10000": {
+        "median_rank": 0,
+        "fullcov": 100.0,
+        "n": 300
+      },
+      "fi_bucket_1000": {
+        "median_rank": 0,
+        "fullcov": 100.0,
+        "n": 300
+      },
+      "fi_bucket_100": {
+        "median_rank": 606,
+        "fullcov": 78.66666666666667,
+        "n": 300
+      },
+      "fi_bucket_10": {
+        "median_rank": 879,
+        "fullcov": 56.333333333333336,
+        "n": 300
+      }
+    },
+    "multi_coarse": {
+      "neural": {
+        "median_rank": 764,
+        "fullcov": 65.0,
+        "n": 300
+      },
+      "fi_bucket_1000000": {
+        "median_rank": 4,
+        "fullcov": 99.0,
+        "n": 300
+      },
+      "fi_bucket_100000": {
+        "median_rank": 5,
+        "fullcov": 99.0,
+        "n": 300
+      },
+      "fi_bucket_10000": {
+        "median_rank": 56,
+        "fullcov": 94.0,
+        "n": 300
+      },
+      "fi_bucket_1000": {
+        "median_rank": 824,
+        "fullcov": 59.333333333333336,
+        "n": 300
+      },
+      "fi_bucket_100": {
+        "median_rank": 1558,
+        "fullcov": 14.0,
+        "n": 300
+      },
+      "fi_bucket_10": {
+        "median_rank": 1605,
+        "fullcov": 15.666666666666666,
+        "n": 300
+      }
+    },
+    "degree_k_hop": {
+      "neural": {
+        "median_rank": 1639,
+        "fullcov": 22.0,
+        "n": 300
+      },
+      "fi_bucket_1000000": {
+        "median_rank": 1460,
+        "fullcov": 29.333333333333332,
+        "n": 300
+      },
+      "fi_bucket_100000": {
+        "median_rank": 1449,
+        "fullcov": 26.666666666666668,
+        "n": 300
+      },
+      "fi_bucket_10000": {
+        "median_rank": 1691,
+        "fullcov": 17.0,
+        "n": 300
+      },
+      "fi_bucket_1000": {
+        "median_rank": 1839,
+        "fullcov": 6.0,
+        "n": 300
+      },
+      "fi_bucket_100": {
+        "median_rank": 1871,
+        "fullcov": 2.3333333333333335,
+        "n": 300
+      },
+      "fi_bucket_10": {
+        "median_rank": 1878,
+        "fullcov": 1.6666666666666667,
+        "n": 300
+      }
+    },
+    "k_hop": {
+      "neural": {
+        "median_rank": 1670,
+        "fullcov": 19.333333333333332,
+        "n": 300
+      },
+      "fi_bucket_1000000": {
+        "median_rank": 1459,
+        "fullcov": 28.666666666666668,
+        "n": 300
+      },
+      "fi_bucket_100000": {
+        "median_rank": 1488,
+        "fullcov": 27.0,
+        "n": 300
+      },
+      "fi_bucket_10000": {
+        "median_rank": 1681,
+        "fullcov": 16.666666666666668,
+        "n": 300
+      },
+      "fi_bucket_1000": {
+        "median_rank": 1838,
+        "fullcov": 3.6666666666666665,
+        "n": 300
+      },
+      "fi_bucket_100": {
+        "median_rank": 1866,
+        "fullcov": 2.3333333333333335,
+        "n": 300
+      },
+      "fi_bucket_10": {
+        "median_rank": 1881,
+        "fullcov": 1.3333333333333333,
+        "n": 300
+      }
+    },
+    "random_walk": {
+      "neural": {
+        "median_rank": 1766,
+        "fullcov": 12.333333333333334,
+        "n": 300
+      },
+      "fi_bucket_1000000": {
+        "median_rank": 1456,
+        "fullcov": 32.0,
+        "n": 300
+      },
+      "fi_bucket_100000": {
+        "median_rank": 1448,
+        "fullcov": 31.0,
+        "n": 300
+      },
+      "fi_bucket_10000": {
+        "median_rank": 1628,
+        "fullcov": 16.0,
+        "n": 300
+      },
+      "fi_bucket_1000": {
+        "median_rank": 1846,
+        "fullcov": 1.6666666666666667,
+        "n": 300
+      },
+      "fi_bucket_100": {
+        "median_rank": 1875,
+        "fullcov": 0.3333333333333333,
+        "n": 300
+      },
+      "fi_bucket_10": {
+        "median_rank": 1902,
+        "fullcov": 1.3333333333333333,
+        "n": 300
+      }
+    }
+  },
+  "overall": {
+    "neural": {
+      "median_rank": 882,
+      "fullcov": 52.94444444444444,
+      "n": 1800
+    },
+    "fi_bucket_1000000": {
+      "median_rank": 103,
+      "fullcov": 64.83333333333333,
+      "n": 1800
+    },
+    "fi_bucket_100000": {
+      "median_rank": 208,
+      "fullcov": 63.94444444444444,
+      "n": 1800
+    },
+    "fi_bucket_10000": {
+      "median_rank": 648,
+      "fullcov": 57.27777777777778,
+      "n": 1800
+    },
+    "fi_bucket_1000": {
+      "median_rank": 1295,
+      "fullcov": 45.111111111111114,
+      "n": 1800
+    },
+    "fi_bucket_100": {
+      "median_rank": 1618,
+      "fullcov": 28.944444444444443,
+      "n": 1800
+    },
+    "fi_bucket_10": {
+      "median_rank": 1714,
+      "fullcov": 21.166666666666668,
+      "n": 1800
+    }
+  }
+}

@@ -1,0 +1,17 @@
+# Auto-emitted by scripts/analysis/reproduce_paper_numbers.py --freeze from local
+# run artifacts: a machine-checkable snapshot of the deployed walk-aware MAG headline
+# (adds per-size slices + the paired McNemar that HEADLINE_NUMBERS.csv omits).
+# Curated canonical headline for ALL datasets = final_results/HEADLINE_NUMBERS.csv.
+scope,name,solved,total,solve_rate_pct,note
+overall,Jigsaw,1595,1800,88.6,
+family,single,296,300,98.7,
+family,k_hop,280,300,93.3,
+family,degree_k_hop,278,300,92.7,
+family,multi_fine,300,300,100.0,
+family,multi_coarse,228,300,76.0,
+family,random_walk,213,300,71.0,
+size,20,559,600,93.2,
+size,50,544,600,90.7,
+size,100,492,600,82.0,
+overall,Mean-RRF,1538,1800,85.4,
+mcnemar,Jigsaw_vs_Mean-RRF,92,35,,"exact McNemar p=4.36e-07; solved=Jigsaw-wins, total=Mean-RRF-wins"

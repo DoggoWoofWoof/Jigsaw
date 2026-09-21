@@ -117,10 +117,48 @@ def upload_package(args: argparse.Namespace) -> None:
 
 
 def build_remote_command(args: argparse.Namespace) -> str:
-    package_ref = _model_ref(args.owner, args.teamspace, args.package_model)
+    artifact_owner = args.artifact_owner or args.owner
+    artifact_teamspace = args.artifact_teamspace or args.teamspace
+    package_ref = _model_ref(artifact_owner, artifact_teamspace, args.package_model)
     result_ref = _model_ref(args.owner, args.teamspace, args.result_model)
-    cache_ref = _model_ref(args.owner, args.teamspace, args.query_cache_model) if args.query_cache_model else ""
-    code_patch_ref = _model_ref(args.owner, args.teamspace, args.code_patch_model) if args.code_patch_model else ""
+    cache_ref = ""
+    if args.query_cache_model:
+        if args.run_mode == "query-cache":
+            # Query-cache jobs create the cache in the destination account.
+            cache_ref = _model_ref(args.owner, args.teamspace, args.query_cache_model)
+        else:
+            cache_owner = args.query_cache_owner or artifact_owner
+            cache_teamspace = args.query_cache_teamspace or artifact_teamspace
+            cache_ref = _model_ref(
+                cache_owner, cache_teamspace, args.query_cache_model
+            )
+    code_patch_ref = (
+        _model_ref(artifact_owner, artifact_teamspace, args.code_patch_model)
+        if args.code_patch_model
+        else ""
+    )
+    resume_ref = (
+        _model_ref(artifact_owner, artifact_teamspace, args.resume_model)
+        if args.resume_model
+        else ""
+    )
+    use_source_auth = bool(
+        os.environ.get("LIGHTNING_SOURCE_USER_ID")
+        and os.environ.get("LIGHTNING_SOURCE_API_KEY")
+    )
+    source_auth_begin = ""
+    source_auth_end = ""
+    if use_source_auth:
+        source_auth_begin = (
+            "export LIGHTNING_DEST_USER_ID=\"$LIGHTNING_USER_ID\"; "
+            "export LIGHTNING_DEST_API_KEY=\"$LIGHTNING_API_KEY\"; "
+            "export LIGHTNING_USER_ID=\"$LIGHTNING_SOURCE_USER_ID\"; "
+            "export LIGHTNING_API_KEY=\"$LIGHTNING_SOURCE_API_KEY\"; "
+        )
+        source_auth_end = (
+            "export LIGHTNING_USER_ID=\"$LIGHTNING_DEST_USER_ID\"; "
+            "export LIGHTNING_API_KEY=\"$LIGHTNING_DEST_API_KEY\"; "
+        )
     normalizer = r'''
 from pathlib import Path
 for root in [Path("/workspace/jigsaw_pkg"), Path("/workspace/jigsaw_patch")]:
@@ -130,9 +168,15 @@ for root in [Path("/workspace/jigsaw_pkg"), Path("/workspace/jigsaw_patch")]:
     for path in sorted([p for p in root.rglob("*") if "\\" in p.name], key=lambda p: len(p.parts)):
         target = path.parent.joinpath(*path.name.split("\\"))
         target.parent.mkdir(parents=True, exist_ok=True)
+        if path.is_file():
+            if target.exists():
+                if target.is_dir():
+                    raise RuntimeError(f"Cannot replace directory with overlay file: {target}")
+                target.unlink()
+            path.replace(target)
+            moved += 1
+            continue
         if target.exists():
-            if path.is_file():
-                path.unlink()
             continue
         path.replace(target)
         moved += 1
@@ -204,12 +248,13 @@ else:
     inner = (
         "set -euo pipefail; "
         "python -m pip install -q -U lightning-sdk; "
-        f"python -c \"from lightning_sdk.models import download_model; "
+        + source_auth_begin
+        + f"python -c \"from lightning_sdk.models import download_model; "
         f"download_model('{package_ref}', '/workspace/jigsaw_pkg', progress_bar=True)\"; "
         f"python -c \"import base64; exec(base64.b64decode('{normalizer_b64}').decode())\"; "
         + (
             f"python -c \"import base64; exec(base64.b64decode('{package_validator_b64}').decode())\"; "
-            if args.run_mode == "benchmark"
+            if args.run_mode == "benchmark" and not args.skip_package_validation
             else ""
         )
         + (
@@ -220,8 +265,21 @@ else:
             if code_patch_ref
             else ""
         )
+        + (
+            f"python -c \"from lightning_sdk.models import download_model; "
+            f"download_model('{resume_ref}', '/workspace/jigsaw_resume', progress_bar=True)\"; "
+            if resume_ref
+            else ""
+        )
+        + source_auth_end
         + "cd /workspace/jigsaw_pkg; "
-        + "chmod +x scripts/run_lightning_mag_benchmark.sh; "
+        + (
+            "mkdir -p runs/lightning_mag_benchmark_results; "
+            "cp -a /workspace/jigsaw_resume/. runs/lightning_mag_benchmark_results/; "
+            if resume_ref
+            else ""
+        )
+        + "chmod +x scripts/launchers/run_lightning_mag_benchmark.sh; "
         + build_tool_setup
         + "python -m pip install -q matplotlib; "
         f"export LIGHTNING_RESULTS_MODEL='{result_ref}'; "
@@ -232,6 +290,10 @@ else:
         f"export QUERIES_PER_TYPE='{args.queries}'; "
         f"export TARGET_SIZES='{args.target_sizes}'; "
         f"export QUERY_TYPES='{args.query_types}'; "
+        f"export EVALUATION_QUERY_TYPES='{args.evaluation_query_types}'; "
+        f"export EVALUATION_QUERY_IDS_DIR='{args.evaluation_query_ids_dir}'; "
+        f"export QUERY_PRUNING_SOURCE='{args.query_pruning_source}'; "
+        f"export SIGNATURE='{args.signature}'; "
         f"export SEEDS='{args.seeds}'; "
         f"export METHODS='{args.methods}'; "
         f"export ABLATION_SET='{args.ablation_set}'; "
@@ -241,7 +303,10 @@ else:
         f"export CACHE_ENCODE_BATCH_SIZE='{args.cache_encode_batch_size}'; "
         f"export MAX_EVAL_QUERIES='{args.max_eval_queries}'; "
         f"export LABEL_SOURCE='{args.label_source}'; "
-        "bash scripts/run_lightning_mag_benchmark.sh"
+        f"export LIGHTNING_RESULTS_ONLY='{'1' if args.results_only else '0'}'; "
+        f"export VALIDATE_QUERY_CACHE_PAYLOADS='{'1' if args.validate_query_cache_payloads else '0'}'; "
+        f"export SKIP_MODEL_VALIDATION='{'1' if args.skip_package_validation else '0'}'; "
+        "bash scripts/launchers/run_lightning_mag_benchmark.sh"
     )
     return "bash -lc " + shlex.quote(inner)
 
@@ -260,7 +325,7 @@ def print_job_command(args: argparse.Namespace) -> None:
         ".\\.venv_modal\\Scripts\\python.exe scripts\\lightning_cli_windows.py job run "
         f"--name {args.job_name} "
         f"--machine {args.machine} "
-        f"--user {args.owner} "
+        f"--org {args.owner} "
         f"--teamspace {args.teamspace} "
         + (f"--cloud {args.cloud} " if args.cloud else "")
         + "--image pytorch/pytorch:2.2.1-cuda12.1-cudnn8-runtime "
@@ -282,7 +347,7 @@ def launch_job(args: argparse.Namespace) -> None:
         args.job_name,
         "--machine",
         args.machine,
-        "--user",
+        "--org",
         args.owner,
         "--teamspace",
         args.teamspace,
@@ -301,6 +366,10 @@ def launch_job(args: argparse.Namespace) -> None:
         cmd.extend(["-e", f"LIGHTNING_USER_ID={os.environ['LIGHTNING_USER_ID']}"])
     if os.environ.get("LIGHTNING_API_KEY"):
         cmd.extend(["-e", f"LIGHTNING_API_KEY={os.environ['LIGHTNING_API_KEY']}"])
+    if os.environ.get("LIGHTNING_SOURCE_USER_ID"):
+        cmd.extend(["-e", f"LIGHTNING_SOURCE_USER_ID={os.environ['LIGHTNING_SOURCE_USER_ID']}"])
+    if os.environ.get("LIGHTNING_SOURCE_API_KEY"):
+        cmd.extend(["-e", f"LIGHTNING_SOURCE_API_KEY={os.environ['LIGHTNING_SOURCE_API_KEY']}"])
     redacted = []
     skip_value = False
     for item in cmd:
@@ -318,6 +387,8 @@ def launch_job(args: argparse.Namespace) -> None:
 def add_common(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--owner", default=os.environ.get("LIGHTNING_OWNER", "kuttakamina9895"))
     parser.add_argument("--teamspace", default=os.environ.get("LIGHTNING_TEAMSPACE", "deploy-model-project"))
+    parser.add_argument("--artifact-owner", default="")
+    parser.add_argument("--artifact-teamspace", default="")
     parser.add_argument("--package-model", default=DEFAULT_PACKAGE_MODEL)
     parser.add_argument("--result-model", default=DEFAULT_RESULT_MODEL)
     parser.add_argument("--job-name", default="jigsaw-mag-rgcn-prod-benchmark")
@@ -327,10 +398,21 @@ def add_common(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--parallel-mode", choices=["task", "query"], default="task")
     parser.add_argument("--run-mode", choices=["query-cache", "benchmark"], default="benchmark")
     parser.add_argument("--query-cache-model", default="")
+    parser.add_argument("--query-cache-owner", default="")
+    parser.add_argument("--query-cache-teamspace", default="")
     parser.add_argument("--code-patch-model", default="")
+    parser.add_argument("--resume-model", default="")
     parser.add_argument("--queries", type=int, default=50)
     parser.add_argument("--target-sizes", default="20,50,100")
     parser.add_argument("--query-types", default="all")
+    parser.add_argument("--evaluation-query-types", default="")
+    parser.add_argument("--evaluation-query-ids-dir", default="")
+    parser.add_argument(
+        "--query-pruning-source",
+        choices=["query_payload_v1", "planted_target_legacy"],
+        default="query_payload_v1",
+    )
+    parser.add_argument("--signature", default="type_feat32")
     parser.add_argument("--seeds", default="20260607,20260608")
     parser.add_argument(
         "--methods",
@@ -343,6 +425,9 @@ def add_common(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--cache-encode-batch-size", default="128")
     parser.add_argument("--max-eval-queries", default="0")
     parser.add_argument("--label-source", choices=["feature", "class"], default="feature")
+    parser.add_argument("--results-only", action="store_true")
+    parser.add_argument("--validate-query-cache-payloads", action="store_true")
+    parser.add_argument("--skip-package-validation", action="store_true")
     parser.add_argument("--interruptible", action="store_true")
 
 
