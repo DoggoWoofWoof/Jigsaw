@@ -147,7 +147,6 @@ Every paper number maps to exactly one source:
 - `benchmarks/paper_results/CANONICAL_SOURCES.md` — number → script + CSV, single source of truth.
 - `final_results/HEADLINE_NUMBERS.csv` — tidy mirror of the production matrix + selector + foreclosure.
 - `scripts/analysis/reproduce_paper_numbers.py` — runnable checker (MAG matrix, selector, foreclosure).
-- `docs/log2026_submission_checklist.md` — submission SHA, page/anonymity checks.
 
 ---
 

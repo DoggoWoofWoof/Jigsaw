@@ -94,15 +94,6 @@ models/_unpushed_lfs_backup/
 # LaTeX bibliography build artifacts
 paper/*.brf
 
-# --- Local-only: internal working docs, kept OUT of the public artifact repo ---
-paper/VLDB-Template/
-paper/RESUBMISSION_PLAN.md
-paper/rebuttal_*.md
-paper/openreview_metadata_rebuttal.md
-paper/jigsaw_log2026_rebuttal.pdf
-paper/jv.txt
-
-# Internal-only results (not reviewer-facing; must stay out of the public repo).
-# These sit under benchmarks/ which is otherwise force-included above, so re-ignore here.
+# Local working files under benchmarks/ (force-included above, so re-ignored here).
 benchmarks/rebuttal/mag_freshseed_20260609_validation.json
 benchmarks/paper_results/ablations/gnn_arch_ablation_cora_epoch10.md

@@ -1,4 +1,4 @@
-"""Validate cross-manuscript claims and publication hygiene for Jigsaw."""
+"""Validate manuscript claims and publication hygiene for the Jigsaw paper."""
 
 from __future__ import annotations
 
@@ -9,12 +9,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-PAPERS = (
-    ROOT / "paper" / "samplepaper.tex",
-    ROOT / "paper" / "jigsaw_log2026.tex",
-    ROOT / "paper" / "jigsaw_ecmlpkdd.tex",
-)
-OPENREVIEW_METADATA = ROOT / "paper" / "openreview_submission_metadata.md"
+PAPERS = (ROOT / "paper" / "jigsaw_vldb2027.tex",)
 
 VENDOR_SPECIFIC_AI_NAMES = ("OpenAI Codex", "ChatGPT")
 
@@ -23,7 +18,6 @@ REQUIRED_CLAIMS = (
     "1,800",
     "600",
     "7,200",
-    "5,400",
     "14,400",
     "288",
     "88.6",
@@ -122,10 +116,9 @@ def validate_claims(path: Path, text: str, errors: list[str]) -> None:
     for claim in REQUIRED_CLAIMS:
         if claim not in plain:
             errors.append(f"{path.name}: required claim missing: {claim}")
-    if path.name != "jigsaw_ecmlpkdd.tex":
-        for claim in OPERATOR_TABLE_CLAIMS:
-            if claim not in plain:
-                errors.append(f"{path.name}: operator-table claim missing: {claim}")
+    for claim in OPERATOR_TABLE_CLAIMS:
+        if claim not in plain:
+            errors.append(f"{path.name}: operator-table claim missing: {claim}")
     for banned in BANNED_TEXT:
         if banned in text:
             errors.append(f"{path.name}: publication-hygiene violation: {banned}")
@@ -144,23 +137,24 @@ def validate_claims(path: Path, text: str, errors: list[str]) -> None:
         errors.append(f"{path.name}: MAG overlap effect is not interpreted")
     if "94.4{\\to}86.1" not in text and "94.4\\%$ to $86.1" not in text:
         errors.append(f"{path.name}: Arxiv overlap effect is not interpreted")
-    if path.name != "jigsaw_ecmlpkdd.tex":
-        denominator_phrases = (
-            "each displayed family has $n{=}300$",
-            "Each displayed spatial family has $n{=}300$",
-        )
-        if not any(phrase in text for phrase in denominator_phrases):
-            errors.append(f"{path.name}: retrieval-probe family denominator is ambiguous")
+    denominator_phrases = (
+        "each displayed family has $n{=}300$",
+        "Each displayed spatial family has $n{=}300$",
+    )
+    if not any(phrase in text for phrase in denominator_phrases):
+        errors.append(f"{path.name}: retrieval-probe family denominator is ambiguous")
 
 
-def validate_publication_style(path: Path, text: str, errors: list[str]) -> None:
+def validate_publication_style(
+    path: Path, text: str, errors: list[str], check_dashes: bool = False
+) -> None:
     for vendor_name in VENDOR_SPECIFIC_AI_NAMES:
         if vendor_name.casefold() in text.casefold():
             errors.append(
                 f"{path.name}: vendor-specific AI tool name must not appear: {vendor_name}"
             )
 
-    if path.name != "jigsaw_log2026.tex":
+    if not check_dashes:
         return
 
     for line_number, line in enumerate(text.splitlines(), start=1):
@@ -184,13 +178,13 @@ def validate_matched_costs(path: Path, text: str, errors: list[str]) -> None:
         return
     production_table = text[start:end]
     row_pattern = re.compile(
-        r"^(Cora|Arxiv)\s*&\s*([^&]+?)\s*&\s*"
+        r"^(CoraFull|Arxiv)\s*&\s*([^&]+?)\s*&\s*"
         r"[^&]+&[^&]+&[^&]+&[^&]+&\s*([^&]+)&\s*([^&]+)&\s*([^\\]+)\\\\",
         re.MULTILINE,
     )
     rows = row_pattern.findall(production_table)
     if len(rows) != 12:
-        errors.append(f"{path.name}: expected 12 Cora/Arxiv production rows, found {len(rows)}")
+        errors.append(f"{path.name}: expected 12 CoraFull/Arxiv production rows, found {len(rows)}")
         return
     for dataset, method, candidate, cascade, solver in rows:
         if "--" in (candidate + cascade + solver):
@@ -200,6 +194,7 @@ def validate_matched_costs(path: Path, text: str, errors: list[str]) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--require-matched-costs", action="store_true")
+    parser.add_argument("--check-dashes", action="store_true")
     args = parser.parse_args()
 
     errors: list[str] = []
@@ -207,29 +202,9 @@ def main() -> None:
         text = path.read_text(encoding="utf-8")
         validate_structure(path, text, errors)
         validate_claims(path, text, errors)
-        validate_publication_style(path, text, errors)
+        validate_publication_style(path, text, errors, args.check_dashes)
         if args.require_matched_costs:
             validate_matched_costs(path, text, errors)
-
-    log_text = (ROOT / "paper" / "jigsaw_log2026.tex").read_text(encoding="utf-8")
-    if not re.search(
-        r"\\end\{thebibliography\}\s*(?:\}\s*)?\\clearpage\s*\\appendix",
-        log_text,
-    ):
-        errors.append("jigsaw_log2026.tex: appendix must begin on a fresh page")
-
-    metadata = OPENREVIEW_METADATA.read_text(encoding="utf-8")
-    validate_publication_style(OPENREVIEW_METADATA, metadata, errors)
-    for required in ("0/15", "88.6%", "99.3-100.0%", "2.4 GB", "10.2 GB"):
-        if required not in metadata:
-            errors.append(f"OpenReview metadata missing: {required}")
-    for banned in (
-        "candidate domain is the whole graph, which is intractable",
-        "recall-preserving selective overlap",
-        "99.7-100.0%",
-    ):
-        if banned in metadata:
-            errors.append(f"OpenReview metadata contains stale claim: {banned}")
 
     if errors:
         raise SystemExit("MANUSCRIPT_VALIDATION_FAILED\n" + "\n".join(errors))

@@ -1,6 +1,6 @@
 # Oversmoothing analysis on the DEPLOYED encoders (GraphSAGE: Cora/Arxiv; RGCN: MAG) (CPU, no retrain)
 
-Answers reviewer gPV809 Q4 (six-layer oversmoothing) and Q3 (residual necessity)
+Checks six-layer oversmoothing and whether the residual connection is necessary,
 directly on the **deployed** weights - no training, no GPU, no Modal account.
 For each coarse partition (the unit retrieval consumes) we run the 6-layer message
 passing and capture node embeddings at every layer, then measure:

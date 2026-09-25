@@ -1,6 +1,6 @@
 """MAG label-selectivity crossover sweep (retrieval-only, no Glasgow).
 
-Answers Reviewer-2 C2 at MAG scale with strict information parity: BOTH the
+Runs the sweep at MAG scale with strict information parity: BOTH the
 classical FeatureIndex and the learned retriever are evaluated on the SAME
 feature-derived label, coarsened identically by a bucket count K
 (label = md5(feature) mod K). We sweep K from near-unique down to coarse and

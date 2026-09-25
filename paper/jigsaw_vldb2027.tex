@@ -1,9 +1,7 @@
-% Jigsaw resubmission (post LoG 2026 reject). Target: PVLDB Vol.20 / VLDB 2027.
+% Jigsaw: PVLDB Vol. 20 / VLDB 2027 research-track submission.
 % Official template: github.com/vldbproceedings/VLDB-Template (acmart.cls v2.19 + pvldb.sty).
 % Format: two-column, 12 pages INCLUDING appendices (references excluded), SINGLE-BLIND
-% (author names required on p1). Frozen LoG submission stays at paper/jigsaw_log2026.tex.
-% Structure follows scratchpad/reorg_blueprint.md: systems-first; methodology + memory
-% result promoted from appendix into the body. Built section by section, compiled green.
+% (author names required on p1).
 
 \documentclass[sigconf, nonacm]{acmart}
 
@@ -286,12 +284,12 @@ MAG   & 1.9M  & \textbf{0/15} & timeout & 88.6\% & $6.97$\,s$^\ast$ & -- \\
 \end{table}
 
 \paragraph{Label-selectivity crossover.}
-Near-unique md5 labels favor exact-label methods: a classical label-coverage index (\textbf{FeatureIndex}, in the GraphGrep~\cite{ref_graphgrep}/gIndex~\cite{ref_gindex} tradition) is the strongest bounded retriever here ($96.7\%$; median worst-true-partition rank $104$ of $2{,}000$) versus the learned GNN ($88.6\%$; rank ${\sim}900$). At coarse $39$-class labels this ranking order \emph{inverts}: the learned model has better worst-true-partition ranks in each family, while complete solve runs are statistically tied (FeatureIndex $63.4\%$; learned variants $63$--$64\%$). This isolates the regime in which learning contributes: as labels stop localizing, the GNN supplies the better partition ranking. The crossover generalizes on CoraFull and Arxiv, where the winner flips with an offline label-selectivity statistic (median partitions/label $1$ at feature labels versus $12$/$124.5$ at class labels), so Jigsaw selects its bounded retriever by label regime (Table~\ref{tab:selectivity_xd_ecml}). Jigsaw is therefore \emph{retriever-agnostic}: it routes to a classical index under near-unique labels and to the learned ranker when labels cease to localize.
+Near-unique md5 labels favor exact-label methods: a classical label-coverage index (\textbf{FeatureIndex}, in the GraphGrep~\cite{ref_graphgrep}/gIndex~\cite{ref_gindex} tradition) is the strongest bounded retriever here ($96.7\%$; median worst-true-partition rank $104$ of $2{,}000$) versus the learned GNN ($88.6\%$; rank ${\sim}900$). At coarse $39$-class labels this ranking order \emph{inverts}: the learned model has better worst-true-partition ranks in each family, while complete solve runs are statistically tied (FeatureIndex $63.4\%$; learned variants $63$--$64\%$). This isolates the regime in which learning contributes: as labels stop localizing, the GNN supplies the better partition ranking. The crossover generalizes on CoraFull and Arxiv, where the winner flips with an offline label-selectivity statistic (median partitions/label $1$ at feature labels versus $12$/$124.5$ at class labels), so Jigsaw selects its bounded retriever by label regime (Table~\ref{tab:selectivity_xd}). Jigsaw is therefore \emph{retriever-agnostic}: it routes to a classical index under near-unique labels and to the learned ranker when labels cease to localize.
 
 \begin{table}[t]
 \centering
 \caption{Cross-dataset label-selectivity crossover: overall median worst-true-partition rank (lower is better; retrieval-only, $n{=}540$ per dataset). Near-unique feature labels favor the classical index; realistic class labels favor the learned retriever.}
-\label{tab:selectivity_xd_ecml}
+\label{tab:selectivity_xd}
 \small
 \resizebox{\columnwidth}{!}{%
 \begin{tabular}{lcccc}

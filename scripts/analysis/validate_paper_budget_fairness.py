@@ -5,17 +5,16 @@ from __future__ import annotations
 
 import csv
 import json
+import re
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-PAPERS = [
-    ROOT / "paper" / "samplepaper.tex",
-    ROOT / "paper" / "jigsaw_log2026.tex",
-    ROOT / "paper" / "jigsaw_ecmlpkdd.tex",
-]
+PAPERS = [ROOT / "paper" / "jigsaw_vldb2027.tex"]
 PARTITIONS = {"cora": 20, "arxiv": 200, "mag": 2000}
 HALF_BUDGETS = {name: count // 2 for name, count in PARTITIONS.items()}
+# The manuscript reports the Cora dataset as CoraFull.
+TEX_DATASET_NAMES = {"Cora": "CoraFull"}
 
 
 def read_csv(path: Path) -> list[dict[str, str]]:
@@ -63,10 +62,11 @@ def main() -> int:
         / "scaling_half_budget_paired_summary.csv"
     )
     scaling_rows = {row["dataset"]: row for row in read_csv(scaling_path)}
-    for dataset in ("cora", "arxiv"):
-        row = scaling_rows.get(dataset)
+    # The paired-scaling CSV stores the Cora dataset under its full name.
+    for dataset, csv_name in (("cora", "corafull"), ("arxiv", "arxiv")):
+        row = scaling_rows.get(csv_name)
         if row is None:
-            errors.append(f"missing paired scaling row for {dataset}")
+            errors.append(f"missing paired scaling row for {csv_name}")
             continue
         if row["paired_queries"] != "15":
             errors.append(f"paired scaling denominator is not 15 for {dataset}")
@@ -140,7 +140,7 @@ def main() -> int:
             errors.append(f"unexpected Cora/Arxiv timeout in matched costs: {row}")
         method_tex = "FilterAll$^\\ddagger$" if method == "FilterAll" else method
         expected_lines.append(
-            f"{dataset} & {method_tex} & "
+            f"{TEX_DATASET_NAMES.get(dataset, dataset)} & {method_tex} & "
             f"{float(row['positive_solve_rate_percent']):.1f} & 100.0 & 0 & 0 & "
             f"{candidate_text(float(row['avg_pruned_candidate_nodes']))} & "
             f"{float(row['avg_total_time_seconds']):.2f} & "
@@ -155,7 +155,8 @@ def main() -> int:
         for required in required_claims:
             if required not in text:
                 errors.append(f"missing budget-fairness marker in {paper.name}: {required}")
-        lines = text.splitlines()
+        # Bold emphasis on table cells (the Jigsaw row) is not part of the value.
+        lines = [re.sub(r"\\textbf\{([^{}]*)\}", r"\1", line) for line in text.splitlines()]
         for expected in expected_lines:
             if lines.count(expected) != 1:
                 errors.append(f"matched production row missing or duplicated in {paper.name}: {expected}")

@@ -8,7 +8,7 @@ This repository is currently organized for the conference submission. Raw cloud 
 
 ### Submission status
 
-The current manuscript is the PVLDB submission `paper/jigsaw_vldb2027.tex` (systems-first framing, two-column PVLDB/acmart format). Earlier builds are retained for provenance: `paper/jigsaw_log2026.tex` (prior LoG/OpenReview version) and `paper/jigsaw_ecmlpkdd.tex` (ECML-PKDD variant).
+The current manuscript is the PVLDB submission `paper/jigsaw_vldb2027.tex` (systems-first framing, two-column PVLDB/acmart format).
 
 Headline: a FullCov-trained GNN retrieval layer for exact Glasgow matching recovers **88.6%** of full-MAG positives under **2.4 GB** residence (vs 10.2 GB whole-graph; direct Glasgow solves 0/15), with boundary overlap nearly doubling matched-half-budget recovery (44.4% -> 88.9%) and query-derived pruning provably lossless. Every manuscript number is re-checkable from the committed CSVs via the `scripts/analysis/validate_*.py` suite (budget fairness, benchmark denominators, query-derived pruning, matched production costs) and `scripts/analysis/reproduce_paper_numbers.py`.
 

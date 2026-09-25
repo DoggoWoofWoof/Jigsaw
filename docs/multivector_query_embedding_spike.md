@@ -122,7 +122,7 @@ multi-vector retriever, **both label regimes**, vs single-vector neural + Featur
 retriever beats FeatureIndex on **solve rate** (McNemar-significant) on ≥1 spatially-extended family
 at coarse labels — ideally overall — while holding contained families. That converts
 "honest characterized non-win" into "learned retrieval wins where a single-vector index/embedding
-cannot," which is exactly what LoG/ECML reviewers said is missing.
+cannot," which is the evidence the current results lack.
 
 ---
 

@@ -3,8 +3,7 @@
 Audit date: 2026-08-01
 
 This audit checks every paper-facing use of an exhaustive partition budget and
-every reported 100% value in `samplepaper.tex`, `jigsaw_log2026.tex`, and
-`jigsaw_ecmlpkdd.tex`.
+every reported 100% value in the earlier manuscript drafts.
 
 ## Corrections made
 
