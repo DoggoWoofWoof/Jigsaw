@@ -1,0 +1,12 @@
+diff --git a/configuration/config.h b/configuration/config.h
+--- a/configuration/config.h
++++ b/configuration/config.h
+@@ -45,7 +45,7 @@
+ /**
+  * Define ENABLE_FAILING_SET to enable the failing set pruning set intersection method.
+  */
+-// #define ENABLE_FAILING_SET
++#define ENABLE_FAILING_SET
+ 
+ /**
+  * Enable collection the distribution of the results in the data graph.

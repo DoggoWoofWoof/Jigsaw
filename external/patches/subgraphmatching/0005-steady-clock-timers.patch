@@ -1,0 +1,211 @@
+diff --git a/graph/graph.cpp b/graph/graph.cpp
+--- a/graph/graph.cpp
++++ b/graph/graph.cpp
+@@ -193,7 +193,7 @@ void Graph::loadGraphFromFileCompressed(const std::string &degree_path, const st
+         exit(-1);
+     }
+ 
+-    auto start = std::chrono::high_resolution_clock::now();
++    auto start = std::chrono::steady_clock::now();
+     int int_size;
+     deg_file.read(reinterpret_cast<char *>(&int_size), 4);
+     deg_file.read(reinterpret_cast<char *>(&vertices_count_), 4);
+@@ -208,7 +208,7 @@ void Graph::loadGraphFromFileCompressed(const std::string &degree_path, const st
+     deg_file.close();
+     deg_file.clear();
+ 
+-    auto end = std::chrono::high_resolution_clock::now();
++    auto end = std::chrono::steady_clock::now();
+     std::cout << "Load degree file time: " << std::chrono::duration_cast<std::chrono::seconds>(end - start).count() << " seconds" << std::endl;
+ 
+     std::ifstream adj_file(edge_path, std::ios::binary);
+@@ -221,7 +221,7 @@ void Graph::loadGraphFromFileCompressed(const std::string &degree_path, const st
+         exit(-1);
+     }
+ 
+-    start = std::chrono::high_resolution_clock::now();
++    start = std::chrono::steady_clock::now();
+     size_t neighbors_count = (size_t)edges_count_ * 2;
+     neighbors_ = new ui[neighbors_count];
+ 
+@@ -246,7 +246,7 @@ void Graph::loadGraphFromFileCompressed(const std::string &degree_path, const st
+ 
+     delete[] degrees;
+ 
+-    end = std::chrono::high_resolution_clock::now();
++    end = std::chrono::steady_clock::now();
+     std::cout << "Load adj file time: " << std::chrono::duration_cast<std::chrono::seconds>(end - start).count() << " seconds" << std::endl;
+ 
+ 
+@@ -259,7 +259,7 @@ void Graph::loadGraphFromFileCompressed(const std::string &degree_path, const st
+         exit(-1);
+     }
+ 
+-    start = std::chrono::high_resolution_clock::now();
++    start = std::chrono::steady_clock::now();
+ 
+     labels_ = new ui[vertices_count_];
+     label_file.read(reinterpret_cast<char *>(labels_), sizeof(int) * vertices_count_);
+@@ -288,12 +288,12 @@ void Graph::loadGraphFromFileCompressed(const std::string &degree_path, const st
+         }
+     }
+ 
+-    end = std::chrono::high_resolution_clock::now();
++    end = std::chrono::steady_clock::now();
+     std::cout << "Load label file time: " << std::chrono::duration_cast<std::chrono::seconds>(end - start).count() << " seconds" << std::endl;
+ 
+-    start = std::chrono::high_resolution_clock::now();
++    start = std::chrono::steady_clock::now();
+     BuildReverseIndex();
+-    end = std::chrono::high_resolution_clock::now();
++    end = std::chrono::steady_clock::now();
+     std::cout << "Build reverse index file time: " << std::chrono::duration_cast<std::chrono::seconds>(end - start).count() << " seconds" << std::endl;
+ #if OPTIMIZED_LABELED_GRAPH == 1
+     if (enable_label_offset_) {
+diff --git a/matching/EdgeListToCSR.cpp b/matching/EdgeListToCSR.cpp
+--- a/matching/EdgeListToCSR.cpp
++++ b/matching/EdgeListToCSR.cpp
+@@ -135,7 +135,7 @@ int main(int argc, char *argv[]) {
+ 
+     int max_ele = -1;
+     using namespace std::chrono;
+-    auto io_start = high_resolution_clock::now();
++    auto io_start = steady_clock::now();
+ 
+ #ifdef WITHGPERFTOOLS
+     cout << "\nwith google perf start\n";
+@@ -143,7 +143,7 @@ int main(int argc, char *argv[]) {
+ #endif
+     auto lines = GetEdgeList(input_file_path, max_ele);
+ 
+-    auto io_end = high_resolution_clock::now();
++    auto io_end = steady_clock::now();
+     cout << "1st, read file and parse string cost:" << duration_cast<milliseconds>(io_end - io_start).count()
+          << " ms\n";
+ #ifdef WITHGPERFTOOLS
+@@ -154,14 +154,14 @@ int main(int argc, char *argv[]) {
+     cout << "max vertex id:" << max_ele << "\n";
+     cout << "number of edges:" << lines.size() << "\n";
+ 
+-    auto check_start = high_resolution_clock::now();
++    auto check_start = steady_clock::now();
+     if (IsAlreadyCSROrder(lines)) {
+         cout << "already csr" << "\n";
+-        auto check_end = high_resolution_clock::now();
++        auto check_end = steady_clock::now();
+         cout << "2nd, check csr representation cost:" << duration_cast<milliseconds>(check_end - check_start).count()
+              << " ms\n";
+         WriteToOutputFiles(deg_output_file_path, adj_output_file_path, label_output_file_path, vertex_num, lines, max_ele);
+-        auto write_end = high_resolution_clock::now();
++        auto write_end = steady_clock::now();
+         cout << "3rd, construct csr and write file cost:" << duration_cast<milliseconds>(write_end - check_end).count()
+              << " ms\n";
+     }
+diff --git a/matching/StudyPerformance.cpp b/matching/StudyPerformance.cpp
+--- a/matching/StudyPerformance.cpp
++++ b/matching/StudyPerformance.cpp
+@@ -24,12 +24,12 @@ size_t enumerate(Graph* data_graph, Graph* query_graph, Edges*** edge_matrix, ui
+ 
+     order_id += 1;
+ 
+-    auto start = std::chrono::high_resolution_clock::now();
++    auto start = std::chrono::steady_clock::now();
+     size_t call_count = 0;
+     size_t embedding_count = EvaluateQuery::LFTJ(data_graph, query_graph, edge_matrix, candidates, candidates_count,
+                                matching_order, output_limit, call_count);
+ 
+-    auto end = std::chrono::high_resolution_clock::now();
++    auto end = std::chrono::steady_clock::now();
+     double enumeration_time_in_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+ #ifdef SPECTRUM
+     if (EvaluateQuery::exit_) {
+@@ -111,7 +111,7 @@ int main(int argc, char** argv) {
+      */
+     std::cout << "Load graphs..." << std::endl;
+ 
+-    auto start = std::chrono::high_resolution_clock::now();
++    auto start = std::chrono::steady_clock::now();
+ 
+     Graph* query_graph = new Graph(true);
+     query_graph->loadGraphFromFile(input_query_graph_file);
+@@ -129,7 +129,7 @@ int main(int argc, char** argv) {
+         data_graph->loadGraphFromFileCompressed(degree_file_path, edge_file_path, label_file_path);
+     }
+ 
+-    auto end = std::chrono::high_resolution_clock::now();
++    auto end = std::chrono::steady_clock::now();
+ 
+     double load_graphs_time_in_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+ 
+@@ -149,7 +149,7 @@ int main(int argc, char** argv) {
+     std::cout << "-----" << std::endl;
+     std::cout << "Filter candidates..." << std::endl;
+ 
+-    start = std::chrono::high_resolution_clock::now();
++    start = std::chrono::steady_clock::now();
+ 
+     ui** candidates = NULL;
+     ui* candidates_count = NULL;
+@@ -186,7 +186,7 @@ int main(int argc, char** argv) {
+     if (input_filter_type != "CECI")
+         FilterVertices::sortCandidates(candidates, candidates_count, query_graph->getVerticesCount());
+ 
+-    end = std::chrono::high_resolution_clock::now();
++    end = std::chrono::steady_clock::now();
+     double filter_vertices_time_in_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+ 
+     // Compute the candidates false positive ratio.
+@@ -199,7 +199,7 @@ int main(int argc, char** argv) {
+     std::cout << "-----" << std::endl;
+     std::cout << "Build indices..." << std::endl;
+ 
+-    start = std::chrono::high_resolution_clock::now();
++    start = std::chrono::steady_clock::now();
+ 
+     Edges ***edge_matrix = NULL;
+     if (input_filter_type != "CECI") {
+@@ -211,7 +211,7 @@ int main(int argc, char** argv) {
+         BuildTable::buildTables(data_graph, query_graph, candidates, candidates_count, edge_matrix);
+     }
+ 
+-    end = std::chrono::high_resolution_clock::now();
++    end = std::chrono::steady_clock::now();
+     double build_table_time_in_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+ 
+     size_t memory_cost_in_bytes = 0;
+@@ -227,7 +227,7 @@ int main(int argc, char** argv) {
+     std::cout << "-----" << std::endl;
+     std::cout << "Generate a matching order..." << std::endl;
+ 
+-    start = std::chrono::high_resolution_clock::now();
++    start = std::chrono::steady_clock::now();
+ 
+     ui* matching_order = NULL;
+     ui* pivots = NULL;
+@@ -278,7 +278,7 @@ int main(int argc, char** argv) {
+         std::cout << "The specified order type '" << input_order_type << "' is not supported." << std::endl;
+     }
+ 
+-    end = std::chrono::high_resolution_clock::now();
++    end = std::chrono::steady_clock::now();
+     double generate_query_plan_time_in_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+ 
+     if (input_order_type != "Spectrum") {
+@@ -309,7 +309,7 @@ int main(int argc, char** argv) {
+     size_t time_limit = 0;
+     sscanf(input_time_limit.c_str(), "%zu", &time_limit);
+ 
+-    start = std::chrono::high_resolution_clock::now();
++    start = std::chrono::steady_clock::now();
+ 
+     if (input_engine_type == "EXPLORE") {
+         embedding_count = EvaluateQuery::exploreGraph(data_graph, query_graph, edge_matrix, candidates,
+@@ -346,7 +346,7 @@ int main(int argc, char** argv) {
+         exit(-1);
+     }
+ 
+-    end = std::chrono::high_resolution_clock::now();
++    end = std::chrono::steady_clock::now();
+     double enumeration_time_in_ns = std::chrono::duration_cast<std::chrono::nanoseconds>(end - start).count();
+ 
+ #ifdef DISTRIBUTION

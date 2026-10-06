@@ -1,0 +1,5 @@
+# Patches must apply byte for byte and the build scripts run under bash on Linux,
+# so git never converts their line endings (core.autocrlf is on for Windows clones).
+*.patch -text
+*.sh text eol=lf
+PINS.json text eol=lf

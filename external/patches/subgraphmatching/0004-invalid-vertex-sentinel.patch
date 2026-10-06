@@ -1,0 +1,12 @@
+diff --git a/matching/FilterVertices.cpp b/matching/FilterVertices.cpp
+--- a/matching/FilterVertices.cpp
++++ b/matching/FilterVertices.cpp
+@@ -8,7 +8,7 @@
+ #include <utility/graphoperations.h>
+ #include <vector>
+ #include <algorithm>
+-#define INVALID_VERTEX_ID 100000000
++#define INVALID_VERTEX_ID 0xFFFFFFFFu
+ 
+ bool
+ FilterVertices::LDFFilter(const Graph *data_graph, const Graph *query_graph, ui **&candidates, ui *&candidates_count) {

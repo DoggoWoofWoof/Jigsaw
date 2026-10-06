@@ -1,0 +1,57 @@
+{
+  "entries": [
+    {
+      "pattern": "(?<![A-Za-z])(?i:(?:algorithm|alg\\.|table|tab\\.|figure|fig\\.|equation|eq\\.|theorem|thm\\.|lemma|definition|def\\.|proposition|prop\\.|corollary|claim|remark|example|line|step|phase|stage|case|rule|observation|property|assumption|part)s?)(?:~|\\s)*\\(?[0-9]{1,2}(?:--?[0-9]{1,2})?(?![0-9]|[.,][0-9]|\\{,\\})",
+      "reason": "numbered reference to a part of the paper (Algorithm 1, Table 2, Lines 3--5, Step 2); names a place in the text, not a measurement"
+    },
+    {
+      "pattern": "(?:(?<![A-Za-z])(?i:(?:section|sec\\.|appendix|app\\.|chapter)s?)|\\\\S)(?:~|\\s)*(?:[A-Z]|[0-9]{1,2})(?:\\.[0-9]{1,2}){0,3}(?![0-9]|[.,][0-9]|\\{,\\})",
+      "reason": "section or appendix number (Section 4.2, Appendix A.3, \\S 5)"
+    },
+    {
+      "pattern": "(?<![A-Za-z])(?:PVLDB|VLDB|VLDBJ|SIGMOD|PODS|ICDE|EDBT|CIDR|KDD|WWW|WSDM|CIKM|ICDM|SDM|NeurIPS|NIPS|ICML|ICLR|AAAI|IJCAI|ACL|EMNLP|LoG|TKDE|TODS)(?:(?:~|\\s)*'[0-9]{2}|(?:~|\\s)*(?:19|20)[0-9]{2})(?![0-9])",
+      "reason": "venue and year of a publication (VLDB 2027, SIGMOD'20)"
+    },
+    {
+      "pattern": "et(?:~|\\s)+al\\.?,?(?:~|\\s)*[(\\[]?(?:19|20)[0-9]{2}[a-z]?(?![0-9])",
+      "reason": "citation year after et al."
+    },
+    {
+      "pattern": "(?:(?<![A-Za-z])(?:Wilson|bootstrap|two-sided)(?:~|\\s)*)?(?<![0-9.])(?:90|95|99)(?:\\\\,)?\\\\?%(?:~|\\s|-)*(?:(?:Wilson|bootstrap|two-sided|one-sided|paired|percentile)(?:~|\\s|-)+)?(?:CIs?|confidence|credible|intervals?)",
+      "reason": "confidence level of an interval (95% CI, 95% Wilson interval): a fixed statistical convention"
+    },
+    {
+      "pattern": "\\\\alpha(?:~|\\s)*=(?:~|\\s)*0?\\.(?:1|05|01|001)(?![0-9])",
+      "reason": "significance level alpha of a test: a fixed statistical convention"
+    },
+    {
+      "pattern": "(?<![A-Za-z0-9\\\\])[pP](?:99\\.9|999|50|90|95|99)(?![0-9])",
+      "reason": "percentile name (p50, p99), the name of a statistic rather than its value"
+    },
+    {
+      "pattern": "(?<![0-9.])(?:50|90|95|99)(?:th)?(?:~|\\s|-)*percentile",
+      "reason": "percentile name (95th percentile), the name of a statistic rather than its value"
+    },
+    {
+      "pattern": "(?<![A-Za-z0-9\\\\])[A-Z][A-Za-z]{0,3}[0-9]{1,2}(?![0-9]|[.,][0-9]|\\{,\\})",
+      "reason": "short identifier of an experiment, regime, layer or question (E1, PE2, R0, L6, Q3): a name, not a value"
+    },
+    {
+      "pattern": "[_^]\\{?\\(?-?[0-9](?![0-9])",
+      "reason": "single-digit index or exponent in math notation (x_1, n^2, h^{(0)}); a multi-digit exponent such as 10^{-12} is still checked"
+    },
+    {
+      "pattern": "(?<![0-9.,])1(?:~|\\s)*\\+(?:~|\\s)*(?=\\\\|[A-Za-z(|])",
+      "reason": "the constant 1 in a definition such as 1 + x or 1 + \\log n"
+    }
+  ],
+  "notes": [
+    "Reviewed allowlist for scripts/canonical/validate_paper_numbers.py (check 'numerals').",
+    "Every numeral in the paper body outside masked text must match an entry here or be replaced by \\jnum{KEY}, \\jci{KEY}, \\jn{KEY}, a generated table or a generated figure.",
+    "A pattern entry {pattern, reason} allows a numeral when a match of the regex that starts at or before the numeral in its context covers the whole numeral. The context is the comment-stripped LaTeX source around the numeral within its paragraph, whitespace collapsed, at most 40 characters on each side. A pattern that would allow a bare numeral (7, 95.4, 1,800, 2026) is refused.",
+    "A context entry {context, numeral, reason} allows one numeral in one exact (whitespace-normalised) context; use it for the structural numerals no generic pattern should cover.",
+    "The starter patterns below are generic and structural only: numbered references to parts of the paper, citation years, the confidence and significance levels of the statistics, percentile names, short identifiers such as E1, PE2, R0 or Q3, single-digit indices and exponents in math notation, and the constant 1 in a definition such as 1 + x. Protocol parameters (timeouts, budgets, seeds, dataset sizes) are not structural: print them with \\jnum. protocol_numbers.py writes a protocol.* key for every numeric protocol setting (--list prints them), and dataset_numbers.py writes the data.* keys of each prepared store.",
+    "Entries with reason UNREVIEWED (written by --write-allowlist-draft) never allow anything. Review each: replace the numeral by a generated macro, or write why it is not a result and move it here."
+  ],
+  "schema": "jigsaw-paper-allowlist-v1"
+}

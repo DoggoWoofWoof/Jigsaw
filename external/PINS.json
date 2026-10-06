@@ -1,0 +1,69 @@
+{
+  "subgraphmatching": {
+    "repo": "https://github.com/RapidsAtHKUST/SubgraphMatching",
+    "commit": "bcaa935c83709b0220e950634dbf5215ae2a526e",
+    "verified_utc": "2026-09-26T02:13:21Z",
+    "license": "MIT",
+    "build": "external/build_subgraphmatching.sh",
+    "patches": [
+      "external/patches/subgraphmatching/0001-print-embeddings.patch",
+      "external/patches/subgraphmatching/0002-max-query-graph-size-128.patch",
+      "external/patches/subgraphmatching/0003-enable-failing-set.patch",
+      "external/patches/subgraphmatching/0004-invalid-vertex-sentinel.patch",
+      "external/patches/subgraphmatching/0005-steady-clock-timers.patch"
+    ],
+    "binary": "external/bin/subgraphmatching/SubgraphMatching.out",
+    "notes": [
+      "HEAD of master when verified (commit date 2023-10-26). Sun and Luo, In-Memory Subgraph Matching: an In-depth Study, SIGMOD 2020.",
+      "Adapter: scripts/canonical/classical.py. Presets gql=GQL/GQL/LFTJ, cfl=CFL/GQL/LFTJ, dpiso=DPiso/GQL/LFTJ follow README lines 176-178 and 193; failing sets compiled in (0003) as README lines 178 and 181 recommend.",
+      "One query per process; the data graph is re-read by every run (Load graphs time is reported apart from Total time, which excludes it).",
+      "Built without CMAKE_BUILD_TYPE, as upstream documents: -O3 -g -march=native, asserts active. checkQueryPlanCorrectness asserts a connected query, so the adapter rejects disconnected queries before running.",
+      "SI 0 (AVX2 set intersection) is the upstream default; the build machine needs AVX2 and the binary is tied to its -march=native CPU.",
+      "Vertex ids, degrees and CSR offsets are 32-bit (ui): 2|E| must stay below 2^32 (papers100M: 3.23e9, fits without headroom).",
+      "The shared libraries libgraph.so and libutility.so are copied next to the binary; the build sets RPATH to $ORIGIN.",
+      "0005 moves every timer (matching/StudyPerformance.cpp, graph/graph.cpp, matching/EdgeListToCSR.cpp) from high_resolution_clock, which libstdc++ defines as system_clock, to steady_clock, so the reported stage times that run_external.reported_stages reads (Load graphs time, Total time) cannot absorb a realtime step."
+    ]
+  },
+  "glasgow": {
+    "repo": "https://github.com/ciaranm/glasgow-subgraph-solver",
+    "commit": "b62cc77777467e9fe19d9b558d706adb92989130",
+    "verified_utc": "2026-09-26T02:13:21Z",
+    "license": "MIT",
+    "build": "external/build_glasgow.sh",
+    "patches": [
+      "external/patches/glasgow/0001-steady-clock-timeout.patch"
+    ],
+    "binary": "external/bin/glasgow_subgraph_solver",
+    "notes": [
+      "HEAD of main when verified (commit date 2026-09-25). Adapter: GlasgowBackend in scripts/canonical/backends.py.",
+      "Every flag GlasgowBackend passes exists at this commit (src/glasgow_subgraph_solver.cc): --timeout int seconds (line 53), --count-solutions (60), --print-all-solutions (61), --solution-limit, which implies counting (62), --format vertexlabelledlad (65).",
+      "Output: status = true/false/aborted (lines 372-379); aborted is also printed when --solution-limit is reached, which GlasgowBackend reads as FOUND because it checks mappings first. solution_count (382), mapping lines (313-316 with --print-all-solutions, 387-391 otherwise), runtime in ms (394), and verify_homomorphism re-checks the mapping (399).",
+      "Needs C++20, CMake >= 3.21, GMP with gmpxx, and network access at configure time: FetchContent pulls cxxopts v3.3.1 and, unless installed, Catch2 v3.4.0 and nlohmann_json v3.12.0.",
+      "Release build adds -march=native (CMakeLists.txt line 86); the binary is tied to the build CPU.",
+      "0001 moves the --timeout clock (gss/timeout.cc lines 25 and 42) from system_clock to steady_clock, so a step of the realtime clock (NTP or VM time sync) cannot end a run early or late. The started_at line (src/glasgow_subgraph_solver.cc line 292) stays on the wall clock."
+    ]
+  },
+  "gnnpe": {
+    "repo": "https://github.com/JamesWhiteSnow/GNN-PE",
+    "commit": "21c6953b423bb67254954e9a1c0aa8da6de03e15",
+    "verified_utc": "2026-09-26T02:13:21Z",
+    "license": null,
+    "build": "external/build_gnnpe.sh",
+    "patches": [
+      "external/patches/gnnpe/0001-print-embeddings.patch",
+      "external/patches/gnnpe/0002-steady-clock-timers.patch"
+    ],
+    "binary": "external/bin/gnnpe/main",
+    "notes": [
+      "HEAD of main when verified (commit date 2026-01-18). Ye, Lian and Chen, Efficient Exact Subgraph Matching via GNN-based Path Dominance Embedding, PVLDB 17(7), 2024. Adapter: scripts/canonical/gnnpe_adapter.py.",
+      "No license file at this commit: ask the authors before redistributing the patch or a built binary.",
+      "Upstream prints only a count (Answer Number: N Query Time (ms): T, src/main.cpp line 179); 0001 adds --print-embeddings so the protocol gets witnesses.",
+      "Matching semantics in the code: non-induced, injective, label equality, undirected; see external/README.md for file and line references.",
+      "Known exactness hazards read from the source, not yet run: data and query paths are stored in one orientation each (include/custom.h lines 66-79 and 94-106) and compared position by position (line 412), which can drop true matches; queries under 3 vertices get an empty plan; only -l 2 is consistent (dfs always emits 3-vertex paths).",
+      "More hazards: query() enters the root with level 1 (include/custom.h line 375), so a partition whose R-tree is a single leaf (1 to 38 paths at -e 2) is walked as an internal node and the adapter refuses it; query() breaks out of the whole traversal at the first entry whose key fails (lines 396-399); the search heap holds 100000 entries (include/heap/heap.h line 3) and a full heap exits with status 0.",
+      "No trained GNN is loaded at this commit: vertex embeddings come from a label-seeded mt19937 vector plus the sum over neighbours (include/custom.h lines 492-544).",
+      "The offline stage enumerates every 3-vertex path (sum over v of C(deg v, 2)); gnnpe_adapter.estimate_path_count() gives the count before running.",
+      "0002 moves every timer of GNN-PE (src/main.cpp, include/custom.h, libsrc/graph/graph.cpp) from high_resolution_clock (system_clock under libstdc++) to steady_clock, so Query Time (ms) cannot absorb a realtime step. GNN-PGE is not built and keeps its timers."
+    ]
+  }
+}

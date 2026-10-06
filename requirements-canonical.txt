@@ -1,0 +1,17 @@
+# The canonical rerun (scripts/canonical): data preparation, query sets, serving,
+# the experiment runners, the reducers and tests/canonical.
+#
+# Developed and tested with Python 3.13.5 and exactly these versions. Serving and
+# the runners never import torch; install torch only on the training machine, as a
+# CUDA wheel that matches its driver, for example
+#   pip install torch==2.8.0 --index-url https://download.pytorch.org/whl/cu128
+# Do not use requirements_lightning_rgcn.txt here: it is the legacy stack
+# (numpy<2, pymetis 2022.1, torch 2.2.1), which the canonical package was not tested with.
+-r requirements-repro.txt
+scipy==1.16.1
+psutil==7.2.2
+pymetis==2025.2.1
+networkx==3.5
+# pins the BLAS/OpenMP pools of timed runs; without it only the thread environment variables apply
+threadpoolctl==3.6.0
+pytest==8.4.2

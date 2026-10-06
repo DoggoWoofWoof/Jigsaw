@@ -1,0 +1,121 @@
+diff --git a/matching/EvaluateQuery.h b/matching/EvaluateQuery.h
+--- a/matching/EvaluateQuery.h
++++ b/matching/EvaluateQuery.h
+@@ -75,6 +75,9 @@
+ #ifdef DISTRIBUTION
+     static size_t* distribution_count_;
+ #endif
++    // -print_embeddings: print each embedding as one flushed line "embedding: u0:v0 u1:v1 ...".
++    static bool print_embeddings_;
++    static void printEmbedding(const ui *embedding, ui query_vertices_num);
+ private:
+     static void generateBN(const Graph *query_graph, ui *order, ui *pivot, ui **&bn, ui *&bn_count);
+     static void generateBN(const Graph *query_graph, ui *order, ui **&bn, ui *&bn_count);
+diff --git a/matching/EvaluateQuery.cpp b/matching/EvaluateQuery.cpp
+--- a/matching/EvaluateQuery.cpp
++++ b/matching/EvaluateQuery.cpp
+@@ -6,6 +6,7 @@
+ #include "utility/computesetintersection.h"
+ #include <vector>
+ #include <cstring>
++#include <cstdio>
+ 
+ #include "utility/pretty_print.h"
+ 
+@@ -25,6 +26,17 @@
+ size_t* EvaluateQuery::distribution_count_;
+ #endif
+ 
++bool EvaluateQuery::print_embeddings_ = false;
++
++void EvaluateQuery::printEmbedding(const ui *embedding, ui query_vertices_num) {
++    printf("embedding:");
++    for (ui u = 0; u < query_vertices_num; ++u) {
++        printf(" %u:%u", u, embedding[u]);
++    }
++    printf("\n");
++    fflush(stdout);
++}
++
+ void EvaluateQuery::generateBN(const Graph *query_graph, ui *order, ui *pivot, ui **&bn, ui *&bn_count) {
+     ui query_vertices_num = query_graph->getVerticesCount();
+     bn_count = new ui[query_vertices_num];
+@@ -125,6 +137,9 @@
+ 
+             if (cur_depth == max_depth - 1) {
+                 embedding_cnt += 1;
++                if (print_embeddings_) {
++                    printEmbedding(embedding, query_graph->getVerticesCount());
++                }
+                 visited_vertices[v] = false;
+                 if (embedding_cnt >= output_limit_num) {
+                     goto EXIT;
+@@ -338,6 +353,9 @@
+ 
+             if (cur_depth == max_depth - 1) {
+                 embedding_cnt += 1;
++                if (print_embeddings_) {
++                    printEmbedding(embedding, query_graph->getVerticesCount());
++                }
+                 visited_vertices[v] = false;
+ 
+ #ifdef DISTRIBUTION
+@@ -635,6 +653,9 @@
+ 
+             if (cur_depth == max_depth - 1) {
+                 embedding_cnt += 1;
++                if (print_embeddings_) {
++                    printEmbedding(embedding, query_graph->getVerticesCount());
++                }
+                 visited_vertices[v] = false;
+                 if (embedding_cnt >= output_limit_num) {
+                     goto EXIT;
+@@ -750,6 +771,9 @@
+ 
+             if (cur_depth == max_depth - 1) {
+                 embedding_cnt += 1;
++                if (print_embeddings_) {
++                    printEmbedding(embedding, query_graph->getVerticesCount());
++                }
+                 visited_vertices[v] = false;
+                 if (embedding_cnt >= output_limit_num) {
+                     goto EXIT;
+@@ -922,6 +946,9 @@
+ 
+                 if (cur_depth == max_depth - 1) {
+                     embedding_cnt += 1;
++                    if (print_embeddings_) {
++                        printEmbedding(embedding, query_graph->getVerticesCount());
++                    }
+                     visited_vertices[v] = false;
+ #ifdef ENABLE_FAILING_SET
+                     reverse_embedding.erase(embedding[u]);
+@@ -1279,6 +1306,9 @@
+ #endif
+             if (cur_depth == max_depth - 1) {
+                 embedding_cnt += 1;
++                if (print_embeddings_) {
++                    printEmbedding(embedding, query_graph->getVerticesCount());
++                }
+                 visited_vertices[v] = false;
+ #ifdef ENABLE_FAILING_SET
+                 reverse_embedding.erase(embedding[u]);
+diff --git a/matching/StudyPerformance.cpp b/matching/StudyPerformance.cpp
+--- a/matching/StudyPerformance.cpp
++++ b/matching/StudyPerformance.cpp
+@@ -88,6 +88,7 @@
+     std::string input_order_num = command.getOrderNum();
+     std::string input_distribution_file_path = command.getDistributionFilePath();
+     std::string input_csr_file_path = command.getCSRFilePath();
++    EvaluateQuery::print_embeddings_ = command.commandOptionExists("-print_embeddings");
+     /**
+      * Output the command line information.
+      */
+@@ -102,6 +103,7 @@
+     std::cout << "\tTime Limit (seconds): " << input_time_limit << std::endl;
+     std::cout << "\tOrder Num: " << input_order_num << std::endl;
+     std::cout << "\tDistribution File Path: " << input_distribution_file_path << std::endl;
++    std::cout << "\tPrint Embeddings: " << (EvaluateQuery::print_embeddings_ ? "true" : "false") << std::endl;
+     std::cout << "--------------------------------------------------------------------" << std::endl;
+ 
+     /**

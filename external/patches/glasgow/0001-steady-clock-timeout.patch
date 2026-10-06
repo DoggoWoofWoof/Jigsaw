@@ -1,0 +1,21 @@
+diff --git a/gss/timeout.cc b/gss/timeout.cc
+--- a/gss/timeout.cc
++++ b/gss/timeout.cc
+@@ -22,7 +22,7 @@ using std::unique_lock;
+ 
+ using std::chrono::operator""s;
+ using std::chrono::seconds;
+-using std::chrono::system_clock;
++using std::chrono::steady_clock;
+ 
+ struct Timeout::Detail
+ {
+@@ -39,7 +39,7 @@ Timeout::Timeout(const seconds limit) :
+     _detail->abort.store(false);
+     if (0s != limit) {
+         _detail->timeout_thread = thread([limit, &detail = this->_detail] {
+-            auto abort_time = system_clock::now() + limit;
++            auto abort_time = steady_clock::now() + limit;
+             {
+                 /* Sleep until either we've reached the time limit,
+                  * or we've finished all the work. */
