@@ -88,11 +88,23 @@ def command_keys(text: str, command: str) -> list[str]:
     return keys
 
 
+def bibtex_keys(path: Path, text: str, errors: list[str]) -> list[str]:
+    keys: list[str] = []
+    for name in command_keys(text, "bibliography"):
+        bib_path = path.parent / (name if name.endswith(".bib") else f"{name}.bib")
+        if not bib_path.exists():
+            errors.append(f"{path.name}: bibliography file missing: {bib_path.name}")
+            continue
+        bib_text = bib_path.read_text(encoding="utf-8")
+        keys.extend(re.findall(r"^\s*@\w+\s*\{\s*([^,\s]+)\s*,", bib_text, re.MULTILINE))
+    return keys
+
+
 def validate_structure(path: Path, text: str, errors: list[str]) -> None:
     labels = command_keys(text, "label")
     refs = command_keys(text, "ref") + command_keys(text, "pageref")
     citations = command_keys(text, "cite")
-    bibitems = command_keys(text, "bibitem")
+    bibitems = command_keys(text, "bibitem") + bibtex_keys(path, text, errors)
 
     duplicate_labels = sorted(key for key, count in Counter(labels).items() if count > 1)
     duplicate_bibitems = sorted(
