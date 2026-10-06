@@ -11,7 +11,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from scripts.canonical import backends, cascade, classical, manifest, queries, seal, verify
+from scripts.canonical import backends, cascade, classical, manifest, protocol, queries, seal, verify
 from scripts.canonical import certify_negatives as cn
 from scripts.canonical import store as store_mod
 
@@ -211,6 +211,7 @@ def test_sealed_sets_use_the_protocol_stages(cstore, tmp_path, monkeypatch):
     _, copy, _ = cstore
     log = tmp_path / "UNSEAL_LOG.jsonl"
     monkeypatch.setattr(seal, "UNSEAL_LOG", log)
+    monkeypatch.setattr(protocol, "FROZEN_PROTOCOL_HASH", None)  # the committed protocol is frozen; this test is the unfrozen refusal
     out = tmp_path / "cert"
     with pytest.raises(seal.SealError, match="--unseal"):
         cn.main(_run(copy, out, split="test"))

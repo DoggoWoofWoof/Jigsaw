@@ -171,6 +171,7 @@ def test_sealed_sets_need_the_protocol_settings_and_the_gate(estore, tmp_path, m
     _, copy, _ = estore
     log = tmp_path / "UNSEAL_LOG.jsonl"
     monkeypatch.setattr(seal, "UNSEAL_LOG", log)
+    monkeypatch.setattr(protocol, "FROZEN_PROTOCOL_HASH", None)  # the committed protocol is frozen; this test is the unfrozen refusal
     out = tmp_path / "e15"
     with pytest.raises(seal.SealError, match="--unseal"):
         en.main(_argv(copy, out, "--arms", "jigsaw_index", split="test"))

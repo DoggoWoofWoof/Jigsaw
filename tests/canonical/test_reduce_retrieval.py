@@ -836,6 +836,7 @@ def test_written_numbers_load_in_the_paper_builder(tmp_path):
 
 
 def test_frozen_needs_the_frozen_hash_and_every_input_run_under_it(tmp_path, monkeypatch):
+    monkeypatch.setattr(protocol, "FROZEN_PROTOCOL_HASH", None)
     before = write_e4(tmp_path, name="e4-before")  # run while FROZEN_PROTOCOL_HASH was unset
     monkeypatch.setattr(protocol, "FROZEN_PROTOCOL_HASH", protocol.protocol_hash())
     assert protocol.is_frozen()
