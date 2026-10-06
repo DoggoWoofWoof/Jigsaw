@@ -23,7 +23,7 @@ PROTOCOL_VERSION = "canonical-v1"
 # Filled by `python -m scripts.canonical.seal commit` before any development run.
 SEAL_COMMITMENT: str | None = "2d16ee4edac05f9d2a3827a313e289eacd4beff824618e352f073287c3b16978"
 # Filled at the freeze (Phase 3). Excluded from the hash it certifies.
-FROZEN_PROTOCOL_HASH: str | None = None
+FROZEN_PROTOCOL_HASH: str | None = "71227175e5d54ed1311d17da2dc55b2eaddaa80f0a27d2c4207c0ab2caa2c746"
 
 
 # ----------------------------------------------------------------------------
